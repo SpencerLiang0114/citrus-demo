@@ -354,7 +354,6 @@ const BIB = `@inproceedings{wang2026citrus,
                on Pervasive and Ubiquitous Computing (UbiComp Companion '26)},
   year      = {2026},
   publisher = {ACM},
-  doi       = {10.1145/3798063.3839136},
   isbn      = {979-8-4007-2533-3/2026/10}
 }`
 function Paper() {
@@ -372,7 +371,6 @@ function Paper() {
           <p className="text-sm text-stone-500 mt-4">Companion of the 2026 ACM International Joint Conference on Pervasive and Ubiquitous Computing · October 11–15, 2026 · Shanghai, China · 5 pages · CC BY 4.0</p>
           <div className="flex flex-wrap gap-2.5 mt-5">
             <a href="/citrus.pdf" className="px-5 py-2.5 rounded-full bg-blue-700 text-white text-sm font-semibold hover:bg-blue-800">Read the paper (PDF)</a>
-            <a href="https://doi.org/10.1145/3798063.3839136" target="_blank" rel="noreferrer" className="px-5 py-2.5 rounded-full border border-stone-300 text-sm font-semibold text-stone-700 hover:border-blue-500">DOI: 10.1145/3798063.3839136 ↗</a>
             <span className="px-5 py-2.5 rounded-full border border-dashed border-stone-300 text-sm text-stone-400">Code / data: not included with the paper PDF</span>
           </div>
           <div className="grid grid-cols-3 gap-3 mt-8 text-center">
@@ -414,7 +412,6 @@ export default function App() {
             {[['Overview', 'top'], ['Interactive Demo', 'demo'], ['Algorithm', 'algorithm'], ['Evaluation', 'evaluation'], ['Paper', 'paper']].map(([l, id]) => <button key={id} onClick={() => scrollTo(id)} className="hover:text-blue-700 transition">{l}</button>)}
           </div>
           <div className="ml-auto flex gap-2">
-            <a href="https://doi.org/10.1145/3798063.3839136" target="_blank" rel="noreferrer" className="hidden sm:block px-4 py-1.5 rounded-full border border-stone-300 text-[13px] font-semibold hover:border-blue-500">DOI ↗</a>
             <a href="/citrus.pdf" className="px-4 py-1.5 rounded-full bg-stone-900 text-white text-[13px] font-semibold hover:bg-stone-700">Paper PDF</a>
           </div>
         </div>
@@ -429,7 +426,6 @@ export default function App() {
         <div className="flex flex-wrap gap-2.5 mt-6">
           <button onClick={() => scrollTo('demo')} className="px-6 py-3 rounded-full bg-blue-700 text-white font-semibold text-sm hover:bg-blue-800 shadow-sm">Explore Interactive Demo ↓</button>
           <a href="/citrus.pdf" className="px-6 py-3 rounded-full border border-stone-300 font-semibold text-sm hover:border-blue-500">Paper PDF</a>
-          <a href="https://doi.org/10.1145/3798063.3839136" target="_blank" rel="noreferrer" className="px-6 py-3 rounded-full border border-stone-300 font-semibold text-sm hover:border-blue-500">DOI ↗</a>
         </div>
         <div className="border border-stone-200 rounded-2xl mt-9 px-4 pt-2 pb-1 bg-gradient-to-b from-white to-stone-50"><HeroCanvas /></div>
         <div className="grid md:grid-cols-4 gap-3 mt-6 text-center">
@@ -447,7 +443,7 @@ export default function App() {
       <Evaluation />
       <Paper />
       <footer className="max-w-6xl mx-auto px-5 py-8 border-t border-stone-200 flex flex-wrap gap-3 justify-between text-[12px] text-stone-400">
-        <span>CITRUS · UbiComp Companion ’26 · DOI 10.1145/3798063.3839136 · CC BY 4.0</span>
+        <span>CITRUS · UbiComp Companion ’26 · CC BY 4.0</span>
         <span>Playground data: synthetic illustration from the paper protocol · Published results: verbatim from the paper</span>
       </footer>
     </div>

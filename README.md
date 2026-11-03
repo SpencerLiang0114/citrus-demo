@@ -1,15 +1,15 @@
 # CITRUS — Interactive Research Website
 
 CITRUS: Candidate Inference, Temporal Decoding, and Reliability-Gated Reporting
-for Wearable Devices (UbiComp Companion '26, DOI 10.1145/3798063.3839136).
+for Wearable Devices (UbiComp Companion '26).
 
 React + TypeScript + Vite + Tailwind CSS. All charts are hand-rolled SVG/canvas.
 
 ## Run
 ```bash
-npm install
-npm run dev      # develop
-npm run build    # production build -> dist/
+pnpm install
+pnpm dev         # develop
+pnpm build       # production build -> dist/
 ```
 
 ## Data honesty
