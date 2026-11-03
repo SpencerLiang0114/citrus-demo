@@ -3,10 +3,9 @@ import { RECORDINGS, POLICIES, PUBLISHED, decide, fmtT, type Candidate, type Pol
 import { HeroCanvas, SignalExplorer, PsdChart, ViterbiGraph, HrTimeline, C } from './components/Viz'
 
 const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-const SectionHead = ({ kicker, title, lede }: { kicker: string; title: string; lede?: string }) => (
+const SectionHead = ({ title, lede }: { kicker?: string; title: string; lede?: string }) => (
   <div className="mb-8">
-    <p className="text-[11px] font-bold tracking-[0.18em] text-blue-700 uppercase">{kicker}</p>
-    <h2 className="font-serif text-3xl md:text-4xl font-semibold text-stone-900 mt-2">{title}</h2>
+    <h2 className="font-serif text-3xl md:text-4xl font-semibold text-stone-900">{title}</h2>
     {lede && <p className="text-stone-600 mt-3 max-w-3xl leading-relaxed">{lede}</p>}
   </div>
 )
@@ -51,7 +50,7 @@ function Playground() {
 
   return (
     <section id="demo" className="max-w-6xl mx-auto px-5 py-16 scroll-mt-20">
-      <SectionHead kicker="Interactive Demo · Centerpiece" title="The Algorithm Playground" lede="One recording, one shared timeline, five synchronized stages. Scrub or press play — every view below follows the same playhead. All replay data is a clearly-labeled synthetic illustration built from the paper's protocol (no raw dataset ships with the PDF); published results are kept separate in Evaluation." />
+      <SectionHead title="The Algorithm Playground" lede="One recording, one shared timeline, five synchronized stages. Scrub or press play — every view follows the same playhead. Replay data is a synthetic illustration from the paper's protocol; published results are in Evaluation." />
 
       {/* shared controls */}
       <div className="sticky top-14 z-30 bg-white/95 backdrop-blur border border-stone-200 rounded-xl p-4 shadow-sm mb-6">
@@ -156,7 +155,7 @@ function Playground() {
         </div>
         <div className="mt-3 border border-stone-200 rounded-xl p-3"><ViterbiGraph rec={rec} upto={vitStep} showIndep={cmp.indep} showVit={cmp.vit} showGT={cmp.gt} /></div>
         <div className="grid lg:grid-cols-2 gap-4 mt-4">
-          <div className="border border-stone-200 rounded-xl overflow-hidden">
+          <div className="border border-stone-200 rounded-xl overflow-x-auto">
             <p className="px-4 py-2.5 bg-stone-50 font-semibold text-sm">Dynamic-programming table — window {vitStep + 1} {vitStep === 0 ? '(D₁(k) = E₁(k))' : `(best predecessor from window ${vitStep})`}</p>
             <table className="w-full text-[13px]"><thead><tr className="text-left text-stone-500 border-b border-stone-200"><th className="px-4 py-2">Candidate k</th><th>E<sub>t</sub>(k)</th><th>Best j → transition Ω</th><th>D<sub>t</sub>(k)</th></tr></thead>
               <tbody>{dpRows.map((r, i) => <tr key={r.c.id} className={`border-b border-stone-100 ${i === 0 ? 'bg-teal-50 font-semibold' : ''}`}><td className="px-4 py-2">{r.c.hr} BPM {i === 0 && <span className="text-teal-700 text-[11px]">← decoded ĥ<sub>t</sub></span>}</td><td className="font-mono">{r.c.cost.toFixed(1)}</td><td className="font-mono">{vitStep === 0 ? '—' : `${r.bestJ.hr} BPM → ${r.trans.toFixed(1)}`}</td><td className="font-mono">{r.total.toFixed(1)}</td></tr>)}</tbody></table>
@@ -190,63 +189,14 @@ function Playground() {
             const d = decisions[i].d
             return <button key={i} onClick={() => setT(w.t0 + 15)} className="flex-1 group" title={`Window ${i + 1}: ${d}`}>
               <div className="rounded-t-md transition-all" style={{ height: `${18 + w.reliability * 44}px`, background: d === 'accept' ? C.teal : d === 'hold' ? C.amber : '#fecaca', opacity: i === winIdx ? 1 : 0.75, marginTop: `${62 - (18 + w.reliability * 44)}px` }} />
-              <p className={`text-[10px] font-bold mt-1.5 ${d === 'accept' ? 'text-teal-700' : d === 'hold' ? 'text-amber-700' : 'text-red-600'}`}>{d.toUpperCase()}</p>
-              <p className="text-[10px] font-mono text-stone-400">r={w.reliability.toFixed(2)}</p>
+              <p className={`hidden sm:block text-[10px] font-bold mt-1.5 ${d === 'accept' ? 'text-teal-700' : d === 'hold' ? 'text-amber-700' : 'text-red-600'}`}>{d.toUpperCase()}</p>
+              <p className="hidden sm:block text-[10px] font-mono text-stone-400">r={w.reliability.toFixed(2)}</p>
             </button>
           })}</div>
           <div className="flex gap-4 mt-3 text-[12px] font-semibold"><span className="text-teal-700">■ Accept — report current estimate</span><span className="text-amber-700">■ Hold — retain last trusted HR</span><span className="text-red-600">■ Reject — withhold measurement</span><span className="text-stone-400 font-normal ml-auto">bar height = reliability r<sub>t</sub> = exp(−|e<sub>t</sub>|/τ<sub>r</sub>) target</span></div>
         </div>
         <div className="mt-3 border border-stone-200 rounded-xl p-3"><HrTimeline rec={rec} upto={11} decisions={decisions} /></div>
-        <div className="grid md:grid-cols-3 gap-3 mt-4">
-          {([['Accept', C.teal, 'Reliability is high: emit ĥt now and update the trusted value.'], ['Hold', C.amber, 'Uncertain but recently trusted: re-emit the last accepted HR rather than a guess. Staleness is penalized in the policy cost.'], ['Reject', C.red, 'No trustworthy value: emit nothing. A gap is better than a confident wrong number.']] as const).map(([k, col, d]) => (
-            <div key={k} className="rounded-xl p-4 border" style={{ borderColor: col + '55', background: col + '0d' }}><p className="font-bold" style={{ color: col }}>{k}</p><p className="text-[13px] text-stone-600 mt-1">{d}</p></div>))}
-        </div>
       </article>
-    </section>
-  )
-}
-
-// ══════════════ ARCHITECTURE ══════════════
-function Architecture() {
-  const [sel, setSel] = useState(2)
-  const mods = [
-    { n: 1, name: 'PPG + ACC Input', io: 'In: IR/red PPG @25 Hz, ACC · Out: 30 s windows', algo: 'ACC-guided selection of motion-quiet segments for spectral estimation.', stage: 1, layer: 'Estimation' },
-    { n: 2, name: 'Candidate Generation', io: 'In: window · Out: ≈140 candidates in [35,220] BPM', algo: 'Welch PSD + autocorrelation + peak-interval peaks, × harmonics (0.5×/1×/2×).', stage: 2, layer: 'Estimation' },
-    { n: 3, name: 'Candidate Scoring', io: 'In: candidate features φt,k · Out: rank logit / cost Et(k)', algo: 'MLP (primary, 28k params) or HGB (stress-test / embedded). Soft targets on reference HR.', stage: 3, layer: 'Estimation' },
-    { n: 4, name: 'Causal Viterbi', io: 'In: costs + accumulated Dt−1 · Out: decoded ĥt', algo: 'Online DP with quadratic transition penalty. Past state only — real-time deployable.', stage: 4, layer: 'Estimation' },
-    { n: 5, name: 'Reliability Estimation', io: 'In: PPG quality, disagreement, dispersion (44–57 feats) · Out: rt', algo: 'HGB regressor on rt = exp(−|et|/τr). AUC 0.898 for error > 10 BPM.', stage: 5, layer: 'Reporting' },
-    { n: 6, name: 'Accept / Hold / Reject', io: 'In: rt × hold-count state · Out: reported HR or nothing', algo: 'Learned finite-state policy via value iteration; λrej sets the coverage–error trade-off.', stage: 5, layer: 'Reporting' },
-  ]
-  return (
-    <section id="algorithm" className="bg-stone-50 border-y border-stone-200 scroll-mt-16">
-      <div className="max-w-6xl mx-auto px-5 py-16">
-        <SectionHead kicker="Algorithm · Figure 1 of the paper" title="Two layers: estimation, then reporting" lede="Click any module to inspect it, then jump straight into that stage of the playground. The key design move is separation: a better estimator does not make every window reliable, so reporting gets its own learned layer." />
-        {(['Estimation', 'Reporting'] as const).map(layer => (
-          <div key={layer} className="mb-5">
-            <p className={`text-[11px] font-bold tracking-[0.16em] uppercase mb-2 ${layer === 'Estimation' ? 'text-blue-700' : 'text-amber-700'}`}>{layer} layer</p>
-            <div className="flex flex-wrap items-stretch gap-2">
-              {mods.filter(m => m.layer === layer).map((m, i, arr) => (
-                <div key={m.n} className="flex items-center gap-2">
-                  <button onClick={() => setSel(m.n)} className={`px-4 py-3 rounded-xl border-2 text-left transition min-w-[150px] ${sel === m.n ? (layer === 'Estimation' ? 'border-blue-600 bg-blue-50' : 'border-amber-600 bg-amber-50') : 'border-stone-200 bg-white hover:border-stone-400'}`}>
-                    <p className="text-[11px] font-mono text-stone-400">0{m.n}</p><p className="font-semibold text-[14px] text-stone-800 leading-tight">{m.name}</p>
-                  </button>
-                  {i < arr.length - 1 && <span className="text-stone-400 font-bold">→</span>}
-                </div>))}
-              {layer === 'Estimation' && <span className="self-center text-stone-400 font-bold ml-1">→</span>}
-            </div>
-          </div>
-        ))}
-        <div className="bg-white border border-stone-200 rounded-xl p-5 mt-4 grid md:grid-cols-[1fr_1fr_auto] gap-4 items-center">
-          <div><p className="text-[11px] font-bold text-stone-400 uppercase tracking-wider">Inputs → Outputs</p><p className="text-sm text-stone-700 mt-1">{mods[sel - 1].io}</p></div>
-          <div><p className="text-[11px] font-bold text-stone-400 uppercase tracking-wider">Algorithm</p><p className="text-sm text-stone-700 mt-1">{mods[sel - 1].algo}</p></div>
-          <button onClick={() => scrollTo(`stage${mods[sel - 1].stage}`)} className="px-5 py-2.5 rounded-full bg-stone-900 text-white text-sm font-semibold hover:bg-stone-700 whitespace-nowrap">Open Stage {mods[sel - 1].stage} ↓</button>
-        </div>
-        <div className="grid md:grid-cols-3 gap-3 mt-6 text-[13px] text-stone-600">
-          <p className="bg-white border border-stone-200 rounded-lg p-3"><b className="text-stone-800">Why candidates?</b> A window under motion contains several plausible HRs. Keeping them explicit makes errors inspectable — you can see <em>which</em> hypothesis won and why.</p>
-          <p className="bg-white border border-stone-200 rounded-lg p-3"><b className="text-stone-800">Why causal?</b> HR is continuous; path-level consistency removes jumps. The causal recursion matches full-sequence decoding (10.66 vs 10.88 BPM) with no future context.</p>
-          <p className="bg-white border border-stone-200 rounded-lg p-3"><b className="text-stone-800">Why report selectively?</b> A confident wrong value is worse than a gap. The learned policy makes the coverage–accuracy trade-off explicit and tunable via λ<sub>rej</sub>.</p>
-        </div>
-      </div>
     </section>
   )
 }
@@ -255,35 +205,18 @@ function Architecture() {
 function Evaluation() {
   const [covIdx, setCovIdx] = useState(3)
   const [showOverall, setShowOverall] = useState(false)
-  const cov = PUBLISHED.coverage[covIdx]
-  const polKey: PolicyKey = cov.cov >= 90 ? 'l30' : cov.cov >= 45 ? 'l8' : 'l4'
-  const rec = RECORDINGS[1]
-  const decisions = useMemo(() => {
-    const out: { d: string; reported: number | null }[] = []; let held: number | null = null
-    for (const w of rec.windows) { const r = decide(w, POLICIES[polKey].thresh, (out.at(-1)?.d as never) ?? null, held); if (r.d === 'accept') held = w.viterbiHR; out.push(r) }
-    return out
-  }, [polKey])
   const CW = 560, CH = 260, CX = (c: number) => 52 + ((100 - c) / 75) * (CW - 80), CY = (m: number) => CH - 36 - (m / 11) * (CH - 60)
   return (
     <section id="evaluation" className="max-w-6xl mx-auto px-5 py-16 scroll-mt-16">
       <SectionHead kicker="Evaluation · Published results" title="What the paper reports" lede="All numbers in this section are the paper's reported values (primary: 31-subject motion-focused ring evaluation, 2,009 windows, 5 seeds). They are independent of the synthetic replay above." />
 
       <h3 className="font-serif text-xl font-semibold mt-2">Motion-robust HR estimation — Table 1 (MAE, BPM)</h3>
-      <div className="grid md:grid-cols-2 gap-6 mt-4">
-        <div className="space-y-3">
-          {PUBLISHED.motionTable.map(r => (
-            <div key={r.method}>
-              <div className="flex justify-between text-[13px]"><span className={r.method.includes('CITRUS') ? 'font-bold text-teal-800' : 'text-stone-600'}>{r.method}</span><b className="font-mono">{r.motion.toFixed(2)}</b></div>
-              <div className="h-4 bg-stone-100 rounded-full mt-1 overflow-hidden"><div className={`h-full rounded-full transition-all duration-700 ${r.method.includes('CITRUS') ? 'bg-teal-600' : 'bg-stone-400'}`} style={{ width: `${(r.motion / 15) * 100}%` }} /></div>
-            </div>))}
-          <p className="text-sm bg-teal-50 border border-teal-200 text-teal-900 rounded-xl px-4 py-3"><b className="font-serif text-2xl">−24%</b> <span className="ml-1">motion MAE vs. the LSTM baseline (14.39 → 10.91 BPM). Static MAE reaches 2.63 BPM — near clinical-reference quality at rest.</span></p>
-        </div>
-        <div className="border border-stone-200 rounded-xl overflow-hidden self-start">
+      <div className="border border-stone-200 rounded-xl overflow-hidden mt-4">
           <table className="w-full text-[13px]"><thead><tr className="bg-stone-50 text-left text-stone-500"><th className="px-4 py-2.5">Configuration</th><th className="px-2 py-2.5">Static</th><th className="px-2 py-2.5">Motion</th><th className="px-2 py-2.5">Overall</th></tr></thead>
             <tbody>{PUBLISHED.motionTable.map(r => <tr key={r.method} className={`border-t border-stone-100 ${r.method.includes('CITRUS') ? 'bg-teal-50 font-semibold' : ''}`}><td className="px-4 py-2.5">{r.method}</td><td className="font-mono px-2">{r.static}</td><td className="font-mono px-2">{r.motion.toFixed(2)}</td><td className="font-mono px-2">{r.overall}</td></tr>)}</tbody></table>
           <p className="text-[11px] text-stone-500 px-4 py-2">± = std over 5 seeds where reported. Platform: 54 participants, 49.76 h vs. clinical references (τ-Ring); motion analysis on 31 subjects, ring-only inputs at runtime.</p>
         </div>
-      </div>
+      <p className="text-sm bg-teal-50 border border-teal-200 text-teal-900 rounded-xl px-4 py-3 mt-4"><b className="font-serif text-2xl">−24%</b> <span className="ml-1">motion MAE vs. the LSTM baseline (14.39 → 10.91 BPM). Static MAE reaches 2.63 BPM.</span></p>
 
       <div className="grid lg:grid-cols-2 gap-8 mt-12">
         <div>
@@ -297,16 +230,10 @@ function Evaluation() {
             <text x={CW / 2} y={CH - 8} fontSize={11} textAnchor="middle" fill={C.mute}>Reported-window coverage (motion windows) → · MAE (BPM) ↑</text>
           </svg>
           <label className="flex items-center gap-2 text-[13px] mt-2 cursor-pointer"><input type="checkbox" checked={showOverall} onChange={() => setShowOverall(!showOverall)} className="accent-amber-600" /> Show overall (static + motion) curve — dashed, values read from Fig. 2 shape</label>
-          <div className="flex gap-3 mt-3 text-center">
-            {[['100% coverage', '9.99 BPM'], ['50% coverage', '6.2 BPM'], ['31% coverage', '2.90 BPM']].map(([k, v], i) => <button key={k} onClick={() => setCovIdx([0, 3, 5][i])} className={`flex-1 rounded-xl py-3 border transition ${covIdx === [0, 3, 5][i] ? 'bg-amber-600 text-white border-amber-600' : 'bg-stone-50 border-stone-200'}`}><p className="font-serif text-lg font-semibold">{v}</p><p className="text-[11px] opacity-80">{k}</p></button>)}
-          </div>
         </div>
         <div>
-          <h3 className="font-serif text-xl font-semibold">Same trade-off, on a timeline</h3>
-          <p className="text-sm text-stone-600 mt-1">Operating point <b>{cov.cov}% / {cov.mae} BPM</b> (≈ {POLICIES[polKey].label}) applied to the illustrative squats recording:</p>
-          <div className="border border-stone-200 rounded-xl p-3 mt-2"><HrTimeline rec={rec} upto={11} decisions={decisions} /></div>
-          <div className="bg-stone-900 text-white rounded-xl p-5 mt-4">
-            <p className="text-[11px] font-bold tracking-[0.16em] text-teal-300 uppercase">Sustained-motion stress test (separate)</p>
+          <div className="bg-stone-900 text-white rounded-xl p-5">
+            <h3 className="font-serif text-xl font-semibold text-white">Sustained-motion stress test</h3>
             <div className="grid grid-cols-3 gap-3 mt-3 text-center">
               <div><p className="font-serif text-2xl font-semibold">17.65 → 15.30</p><p className="text-[11px] text-stone-400">MAE (BPM), HGB baseline → + Viterbi</p></div>
               <div><p className="font-serif text-2xl font-semibold">0.631 → 0.724</p><p className="text-[11px] text-stone-400">Pearson r</p></div>
@@ -323,7 +250,7 @@ function Evaluation() {
           <div className="mt-3 space-y-2">
             {PUBLISHED.ablations.map(a => (
               <details key={a.ablation} className="border border-stone-200 rounded-xl bg-white group">
-                <summary className="px-4 py-3 cursor-pointer text-sm list-none flex justify-between gap-3"><span><b className="text-stone-800">{a.module}:</b> <span className="text-stone-600">{a.ablation}</span></span><span className="font-mono text-[12px] text-teal-800 font-semibold text-right shrink-0">{a.result}</span></summary>
+                <summary className="px-4 py-3 cursor-pointer text-sm list-none flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-3"><span><b className="text-stone-800">{a.module}:</b> <span className="text-stone-600">{a.ablation}</span></span><span className="font-mono text-[12px] text-teal-800 font-semibold sm:text-right break-words">{a.result}</span></summary>
                 <p className="px-4 pb-3.5 text-[13px] text-stone-600 border-t border-stone-100 pt-2.5">{a.detail}</p>
               </details>))}
           </div>
@@ -361,7 +288,7 @@ function Paper() {
   return (
     <section id="paper" className="bg-stone-50 border-t border-stone-200 scroll-mt-16">
       <div className="max-w-6xl mx-auto px-5 py-16 grid lg:grid-cols-[1.2fr_1fr] gap-10">
-        <div>
+        <div className="min-w-0">
           <SectionHead kicker="Paper & Resources" title="CITRUS at UbiComp Companion ’26" />
           <p className="text-[15px] text-stone-700 leading-relaxed"><b>Abstract.</b> Wearable photoplethysmography (PPG) enables continuous heart-rate (HR) monitoring on consumer devices, but motion artifacts introduce frequency-domain ambiguity: during exercise, the dominant spectral component may correspond to limb movement rather than the true pulse. This paper presents CITRUS, a two-layer system that decomposes motion-robust HR monitoring into estimation (candidate selection + causal Viterbi decoding) and reporting (reliability scoring + accept/hold/reject policy). The platform benchmark contains 54 participants and 49.76 h of recordings against clinical references; the motion-focused ring-PPG evaluation uses 31 subjects. On this subset, the estimation layer reduces motion-window Mean Absolute Error (MAE) from 14.39 to 10.91 beats per minute (BPM). We additionally develop an ESP32-S3 real-time prototype for live PPG acquisition, on-device filtering, beat-event extraction, and browser visualization. We deploy the feature-vector CITRUS inference core—candidate scoring, causal decoding, and reliability estimation—on the ESP32-S3, averaging 156.429 ms per window with 145,280 B model storage.</p>
           <div className="mt-5 space-y-2 text-sm">
@@ -373,26 +300,13 @@ function Paper() {
             <a href="/citrus.pdf" className="px-5 py-2.5 rounded-full bg-blue-700 text-white text-sm font-semibold hover:bg-blue-800">Read the paper (PDF)</a>
             <span className="px-5 py-2.5 rounded-full border border-dashed border-stone-300 text-sm text-stone-400">Code / data: not included with the paper PDF</span>
           </div>
-          <div className="grid grid-cols-3 gap-3 mt-8 text-center">
-            {[['54', 'participants · 49.76 h'], ['31 subjects', 'motion-focused eval'], ['2,009', 'windows (267 motion)']].map(([v, k]) => <div key={k} className="bg-white border border-stone-200 rounded-xl py-3"><p className="font-serif text-xl font-semibold">{v}</p><p className="text-[11px] text-stone-500">{k}</p></div>)}
-          </div>
         </div>
-        <div>
-          <p className="text-[11px] font-bold tracking-[0.18em] text-blue-700 uppercase mb-2">Cite this work</p>
+        <div className="min-w-0">
+          <p className="font-serif font-semibold text-lg mb-2">Cite this work</p>
           <div className="relative">
             <pre className="bg-stone-900 text-stone-200 text-[12px] leading-relaxed rounded-xl p-4 overflow-x-auto">{BIB}</pre>
             <button onClick={() => { navigator.clipboard?.writeText(BIB); setCopied(true); setTimeout(() => setCopied(false), 1600) }} className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-[12px] font-semibold">{copied ? 'Copied ✓' : 'Copy BibTeX'}</button>
           </div>
-          <div className="bg-white border border-stone-200 rounded-xl p-5 mt-5">
-            <p className="font-serif font-semibold text-lg">How to explore this page</p>
-            <ol className="text-sm text-stone-600 mt-2 space-y-2 list-decimal pl-5">
-              <li>Start in the playground with <b>Deep squats</b>: find the red motion peak that beats the true HR on raw spectral power.</li>
-              <li>Step the <b>Viterbi decoder</b> window-by-window and watch jump penalties rescue the trajectory.</li>
-              <li>Drop λ<sub>rej</sub> to 4 and watch the reporting layer trade coverage for near-static accuracy.</li>
-              <li>Check every claim against the published tables in Evaluation.</li>
-            </ol>
-          </div>
-          <p className="text-[12px] text-stone-400 mt-4">Data honesty: no dataset or code accompanied the paper PDF, so playground waveforms, candidates, scores, and decisions are deterministic synthetic illustrations generated from the paper's described protocol. Published figures (Tables 1–2, Figure 2 anchors, deployment benchmark) are reproduced verbatim and never blended with illustrative data. Reference HR is shown only as an evaluation target.</p>
         </div>
       </div>
     </section>
@@ -409,7 +323,7 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-5 h-14 flex items-center gap-6">
           <button onClick={() => scrollTo('top')} className="font-serif font-bold text-xl tracking-tight text-stone-900">CITRUS<span className="text-blue-700">.</span></button>
           <div className="hidden md:flex gap-5 text-sm font-medium text-stone-600 ml-2">
-            {[['Overview', 'top'], ['Interactive Demo', 'demo'], ['Algorithm', 'algorithm'], ['Evaluation', 'evaluation'], ['Paper', 'paper']].map(([l, id]) => <button key={id} onClick={() => scrollTo(id)} className="hover:text-blue-700 transition">{l}</button>)}
+            {[['Overview', 'top'], ['Interactive Demo', 'demo'], ['Evaluation', 'evaluation'], ['Paper', 'paper']].map(([l, id]) => <button key={id} onClick={() => scrollTo(id)} className="hover:text-blue-700 transition">{l}</button>)}
           </div>
           <div className="ml-auto flex gap-2">
             <a href="/citrus.pdf" className="px-4 py-1.5 rounded-full bg-stone-900 text-white text-[13px] font-semibold hover:bg-stone-700">Paper PDF</a>
@@ -419,10 +333,10 @@ export default function App() {
 
       {/* HERO */}
       <header id="top" className="max-w-6xl mx-auto px-5 pt-28 pb-10 scroll-mt-20">
-        <p className="text-[12px] font-bold tracking-[0.18em] text-blue-700 uppercase">UbiComp Companion ’26 · Shanghai, China · Oct 11–15, 2026</p>
         <h1 className="font-serif text-[29px] sm:text-4xl md:text-[56px] leading-[1.12] font-semibold text-stone-900 mt-4 max-w-4xl">CITRUS: Candidate Inference, Temporal Decoding, and Reliability-Gated Reporting for Wearable Devices</h1>
-        <p className="font-serif text-xl md:text-2xl text-stone-500 italic mt-5">“From noisy PPG signals to reliable heart-rate estimates.”</p>
-        <p className="mt-6 text-[15px]"><b>Yi Wang</b> <span className="text-stone-500">(HKUST Guangzhou)</span> · <b>Siyuan Liang</b> <span className="text-stone-500">(Cornell)</span> · <b>Yuntao Wang</b> <span className="text-stone-500">(Tsinghua, corresponding)</span></p>
+        <p className="font-serif text-xl md:text-2xl text-stone-500 mt-5">From noisy PPG signals to reliable heart-rate estimates.</p>
+        <p className="text-sm text-stone-500">UbiComp Companion ’26 · Shanghai, China · Oct 11–15, 2026</p>
+        <p className="mt-4 text-[15px]"><b>Yi Wang</b> <span className="text-stone-500">(HKUST Guangzhou)</span> · <b>Siyuan Liang</b> <span className="text-stone-500">(Cornell)</span> · <b>Yuntao Wang</b> <span className="text-stone-500">(Tsinghua, corresponding)</span></p>
         <div className="flex flex-wrap gap-2.5 mt-6">
           <button onClick={() => scrollTo('demo')} className="px-6 py-3 rounded-full bg-blue-700 text-white font-semibold text-sm hover:bg-blue-800 shadow-sm">Explore Interactive Demo ↓</button>
           <a href="/citrus.pdf" className="px-6 py-3 rounded-full border border-stone-300 font-semibold text-sm hover:border-blue-500">Paper PDF</a>
@@ -432,14 +346,9 @@ export default function App() {
           {[['−24%', 'motion MAE vs LSTM (14.39 → 10.91 BPM)', C.teal], ['≈140', 'candidate hypotheses per 30 s window', C.blue], ['2.90 BPM', 'reported MAE at 31% motion coverage', C.amber], ['156.4 ms', 'ESP32-S3 inference-core latency / window', C.ink]].map(([v, k, col]) => (
             <div key={k} className="border border-stone-200 rounded-xl py-4 px-3"><p className="font-serif text-[26px] font-semibold" style={{ color: col as string }}>{v}</p><p className="text-[12px] text-stone-500 mt-1 leading-snug">{k}</p></div>))}
         </div>
-        <div className="grid md:grid-cols-3 gap-4 mt-6">
-          {[['The problem', 'During exercise, the strongest PPG spectral peak is often limb motion, not the pulse. A single window can hold several plausible heart rates — motion-corrupted PPG is an ambiguity problem, not just a denoising problem.'], ['The idea', 'Keep every hypothesis. Generate ≈140 candidates per window, rank them with a learned scorer, enforce physiological continuity with causal Viterbi decoding — then decide whether the result deserves to be reported at all.'], ['The payoff', 'Estimation and reporting are separate layers: 10.91 BPM at full coverage, or 2.90 BPM on the 31% of motion windows the policy trusts. The trade-off is explicit, learned, and tunable.']].map(([h, b]) => (
-            <div key={h} className="bg-stone-50 rounded-xl p-5"><p className="font-serif font-semibold text-lg text-stone-900">{h}</p><p className="text-sm text-stone-600 leading-relaxed mt-1.5">{b}</p></div>))}
-        </div>
       </header>
 
       <Playground />
-      <Architecture />
       <Evaluation />
       <Paper />
       <footer className="max-w-6xl mx-auto px-5 py-8 border-t border-stone-200 flex flex-wrap gap-3 justify-between text-[12px] text-stone-400">
