@@ -60,7 +60,7 @@ function Playground() {
 
   return (
     <section id="demo" className="max-w-6xl mx-auto px-5 py-16 scroll-mt-20">
-      <SectionHead title="The Algorithm Playground" lede="One recording, one shared timeline, five synchronized stages. Scrub or press play — every view follows the same playhead. Windows: subject 00020, scored with the authors' HGB model. Published results in Evaluation." />
+      <SectionHead title="The Algorithm Playground" lede="Five synchronized stages on one shared timeline. Scrub or press play — every view follows the same playhead." />
 
       {/* shared controls */}
       <div className="sticky top-14 z-30 bg-white/95 backdrop-blur rounded-lg p-4 mb-6">
@@ -99,7 +99,7 @@ function Playground() {
       {/* ── STAGE 2 ── */}
       <article id="stage2" className="scroll-mt-36 border-t border-stone-200 pt-10 mt-12">
         <h3 className="font-serif text-2xl font-medium"><span className="text-blue-700">Stage 2 ·</span> Candidate Generation</h3>
-        <p className="text-stone-600 mt-2 max-w-3xl text-[15px] leading-relaxed">Each <Tex tex="30\ \mathrm{s}" /> window yields <b><Tex tex="\approx 140" /> candidates</b> (median <Tex tex="140" />, range <Tex tex="57\text{–}160" />) from three estimator families — Welch PSD peaks, autocorrelation peaks, peak-interval estimates — each expanded with harmonic variants (<Tex tex="0.5\times,\ 1\times,\ 2\times" />) and filtered to <Tex tex="[35,\,220]\ \mathrm{BPM}" />. The chart and list below keep at most <Tex tex="6" /> of them: hypotheses within <Tex tex="2.5\ \mathrm{BPM}" /> collapse to a single marker and chip (<Tex tex="\text{×}n" /> = <Tex tex="n" /> candidates in the top-<Tex tex="12" />), so overlapping hypotheses are never shown twice.</p>
+        <p className="text-stone-600 mt-2 max-w-3xl text-[15px] leading-relaxed">Each <Tex tex="30\ \mathrm{s}" /> window yields <b><Tex tex="\approx 140" /> candidates</b> from three estimator families — Welch PSD peaks, autocorrelation peaks, peak-interval estimates — expanded with harmonic variants (<Tex tex="0.5\times,\ 1\times,\ 2\times" />) and filtered to <Tex tex="[35,\,220]\ \mathrm{BPM}" />. Nearby hypotheses are grouped into a single marker below (<Tex tex="\text{×}n" /> = <Tex tex="n" /> candidates).</p>
         <figure className="figure mt-3"><PsdChart rec={rec} win={win} sel={selCand} onSel={setSelCand} /></figure>
         <div className="flex flex-wrap gap-1.5 mt-3" aria-label="Candidate clusters">
           {clusterRepresentatives(win.candidates).map(({ rep: c, count }, i) => (
@@ -133,10 +133,10 @@ function Playground() {
             per-candidate bars stored for this window; MLP has no per-candidate outputs
             in the data package, so its panel shows that explicitly instead of reusing HGB numbers. */}
         <div key={scorer} className="scorer-swap">
-          <p className={`text-[12px] border rounded-lg px-3 py-2 mt-3 ${scorer === 'MLP' ? 'text-violet-900 bg-violet-50 border-violet-200' : 'text-amber-800 bg-amber-50 border-amber-200'}`}><MathNumbers text={scorer === 'MLP' ? 'MLP scorer (28k params), used in the primary 31-subject evaluation. Removing the raw-waveform CNN encoder: −0.01 BPM, 85k → 28k params.' : 'HGB scorer, used in the sustained-motion stress test and the ESP32-S3 configuration.'} /> {scorer === 'MLP' ? 'Per-candidate MLP outputs for this window are not in the data package — the panel below therefore shows the candidates unscored, plus the MLP results the paper does report. It does not reuse the HGB bars.' : 'The bars below are this scorer\u2019s real outputs for this window (subject 00020). Switch to MLP to see what is — and is not — available for it.'}</p>
+          <p className={`text-[12px] border rounded-lg px-3 py-2 mt-3 ${scorer === 'MLP' ? 'text-violet-900 bg-violet-50 border-violet-200' : 'text-amber-800 bg-amber-50 border-amber-200'}`}>{scorer === 'MLP' ? 'MLP scorer — the paper\u2019s primary configuration. Per-window scores are unavailable here, so candidates are shown unscored.' : 'HGB scorer — used for the stress test and on-device deployment. Scores below are for the current window.'}</p>
           {scorer === 'HGB' ? (
             <div className="mt-4 space-y-1.5">
-              <p className="flex items-center gap-2 text-[12px] font-semibold text-blue-800"><span className="w-2.5 h-2.5 rounded-sm bg-blue-700 inline-block" /> HGB ranking — this window (subject 00020) · click a bar for its feature breakdown</p>
+              <p className="flex items-center gap-2 text-[12px] font-semibold text-blue-800"><span className="w-2.5 h-2.5 rounded-sm bg-blue-700 inline-block" /> HGB ranking — this window · click a bar for its feature breakdown</p>
               {win.candidates.slice(0, 8).map((c, i) => (
                 <div key={c.id}>
                   <button onClick={() => setExpandedCand(expandedCand === c.id ? null : c.id)} aria-expanded={expandedCand === c.id} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition ${expandedCand === c.id ? 'border-blue-400 bg-blue-50' : 'border-stone-200 hover:border-blue-300'}`}>
@@ -157,7 +157,7 @@ function Playground() {
             </div>
           ) : (
             <div className="mt-4">
-              <p className="flex items-center gap-2 text-[12px] font-semibold text-violet-800"><span className="w-2.5 h-2.5 rounded-sm bg-violet-700 inline-block" /> MLP ranking — not stored for this window · same candidates, no invented scores</p>
+              <p className="flex items-center gap-2 text-[12px] font-semibold text-violet-800"><span className="w-2.5 h-2.5 rounded-sm bg-violet-700 inline-block" /> MLP ranking — candidates shown unscored</p>
               <div className="mt-1.5 space-y-1.5" aria-label="Candidates without MLP scores">
                 {win.candidates.slice(0, 8).map((c, i) => (
                   <div key={c.id} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-dashed border-violet-200 bg-violet-50/40 text-left">
@@ -170,7 +170,7 @@ function Playground() {
                   </div>))}
               </div>
               <div className="grid md:grid-cols-3 gap-3 mt-3 text-[13px]">
-                {[['MLP scorer', '28k params', 'Structured candidate features only — removing the raw-waveform CNN encoder changes overall MAE by −0.01 BPM (85k → 28k params).'], ['Primary evaluation', '31 subjects · 5 seeds', 'The configuration behind the paper\u2019s headline motion results in Evaluation below.'], ['Motion MAE, scoring → + Viterbi', '12.94 → 10.91 BPM', 'Per-window MLP scoring alone, then causal decoding (5-seed primary). Per-window bars for this window were not released.']].map(([k, v, d]) => (
+                {[['MLP scorer', '28k params', 'Structured candidate features only — no waveform encoder needed.'], ['Primary evaluation', 'Headline results', 'The configuration behind the motion results in Evaluation below.'], ['Motion MAE, scoring → + Viterbi', '12.94 → 10.91 BPM', 'Per-window scoring, then causal decoding.']].map(([k, v, d]) => (
                   <div key={k} className="bg-violet-50 border border-violet-100 rounded-lg p-3"><p className="text-[11px] font-bold tracking-wider text-violet-700 uppercase">{k}</p><p className="font-serif text-lg font-medium text-stone-900 mt-0.5">{v}</p><p className="text-stone-500 mt-1 text-[12px] leading-relaxed">{d}</p></div>
                 ))}
               </div>
@@ -184,7 +184,7 @@ function Playground() {
       <article id="stage4" className="scroll-mt-36 border-t border-stone-200 pt-10 mt-12">
         <h3 className="font-serif text-2xl font-medium"><span style={{ color: C.teal }}>Stage 4 ·</span> Causal Viterbi Decoding</h3>
         <p className="text-stone-600 mt-2 max-w-3xl text-[15px] leading-relaxed">Per-window winners can still jump implausibly. CITRUS runs an <b>online</b> Viterbi recursion: when window <Tex tex="t" /> arrives, it extends only paths ending at <Tex tex="t-1" /> — no future windows, no backward smoothing — so it deploys in real time. The decoder plays automatically below — <b>one step advances to the next window</b> (<Tex tex={`w_t \\to w_{t+1}`} />, <Tex tex={`${REPLAY.windows.length}`} /> steps in total); pause it to step by hand.</p>
-        <p className="text-[13px] text-stone-600 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2 mt-3 max-w-3xl">Sequential replay: <Tex tex="5" /> consecutive held-out windows (subject <Tex tex="\text{00001}" />, windows <Tex tex="67\text{–}71" />: <Tex tex="2" /> static, <Tex tex="3" /> deep-squat), <Tex tex="582" /> candidate rows with stored causal DP. These are all the consecutive windows in the verified data package — a longer (e.g. <Tex tex="10" />-window) replay would need the authors' stored DP for further windows, so none are invented here.</p>
+        <p className="text-[13px] text-stone-600 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2 mt-3 max-w-3xl">Sequential replay: five consecutive windows — two static, three in deep squats — decoded causally as they arrive.</p>
         <div className="bg-stone-900 text-stone-100 rounded-lg px-5 py-4 mt-4 text-center overflow-x-auto">
           <p className="text-lg md:text-xl whitespace-nowrap"><Tex tex="D_t(k) = E_t(k) + \min_{j}\bigl[\, D_{t-1}(j) + \Omega_t(j,\,k) \,\bigr], \qquad E_t(k) = -\log p_t(k)" /></p>
           <p className="text-stone-400 text-[13px] mt-2 whitespace-nowrap"><Tex tex="\Omega_t(j,k) = \lambda_{\mathrm{tr}} \min\!\Bigl\{\bigl(\Delta_{jk}/\sigma_{jk}\bigr)^{2},\, 9\Bigr\} + 0.25\Bigl(\max\{0,\, \Delta_{jk}-\tau_{jk}\}/\tau_{jk}\Bigr)^{2}" /> <span className="ml-2">with</span> <Tex tex="\lambda_{\mathrm{tr}} = 2.0" /> <span>and</span> <Tex tex="\Delta_{jk} = |h_t(k) - h_{t-1}(j)|" /></p>
@@ -211,13 +211,13 @@ function Playground() {
           {([['Window', <Tex tex={`w_{${vitStep + 1}}\\ \\text{(${vitWin.isMotion ? 'deep-squat, motion' : 'spo2, static'})}`} />], ['Candidates', <Tex tex={`n_t = ${vitWin.candidates.length}`} />], ['Independent argmax', <Tex tex={`${vitWin.independentHR.toFixed(2)}\\ \\mathrm{BPM}`} />], ['Causal decoded', <Tex tex={`\\hat{h}_t = ${vitWin.viterbiHR.toFixed(2)}\\ \\mathrm{BPM}`} />], ['Reference', <Tex tex={`${vitWin.trueHR.toFixed(2)}\\ \\mathrm{BPM}`} />]] as [string, React.ReactNode][]).map(([k, v]) => (
             <div key={k} className="bg-stone-50 rounded-lg p-3"><p className="text-[11px] font-bold tracking-wider text-stone-500 uppercase">{k}</p><p className="font-semibold text-stone-800 mt-0.5">{v}</p></div>))}
         </div>
-        <p className="text-[13px] text-stone-600 mt-3">At the frontier, the independent argmax is off by <Tex tex={`|e_t^{\\mathrm{ind}}| = ${vitWin.errIndep.toFixed(2)}\\ \\mathrm{BPM}`} /> while causal decoding is off by <Tex tex={`|e_t^{\\mathrm{vit}}| = ${vitWin.errVit.toFixed(2)}\\ \\mathrm{BPM}`} />; decoder confidence <Tex tex={`c_t = ${vitWin.decoderConfidence.toFixed(2)}`} />. Under deep squats the per-window winner drifts to <Tex tex="97.01\ \mathrm{BPM}" /> against a <Tex tex="67.00\ \mathrm{BPM}" /> reference — the transition term is what pulls the path back.</p>
+        <p className="text-[13px] text-stone-600 mt-3">At the frontier, the independent argmax is off by <Tex tex={`|e_t^{\\mathrm{ind}}| = ${vitWin.errIndep.toFixed(2)}\\ \\mathrm{BPM}`} /> while causal decoding is off by <Tex tex={`|e_t^{\\mathrm{vit}}| = ${vitWin.errVit.toFixed(2)}\\ \\mathrm{BPM}`} /> — the transition term pulls drifting per-window winners back to a plausible path.</p>
         <div className="grid lg:grid-cols-2 gap-4 mt-4">
           <div className="bg-stone-50 rounded-lg overflow-x-auto">
             <p className="px-4 py-2.5 font-semibold text-sm">Dynamic-programming table — window <Tex tex={`w_{${vitStep + 1}}`} /> {vitStep === 0 ? <>(<Tex tex="D_1(k) = E_1(k)" />, no predecessor)</> : <>(best predecessor from window <Tex tex={`w_{${vitStep}}`} />)</>}</p>
             <table className="w-full text-[13px]"><thead><tr className="text-left text-stone-500 border-b border-stone-200"><th className="px-4 py-2">Candidate <Tex tex="k" /></th><th><Tex tex="E_t(k)" /></th><th>Best predecessor <Tex tex="j" /> · <Tex tex="\Omega_t(j,k)" /></th><th><Tex tex="\tilde{D}_t(k)" /></th></tr></thead>
               <tbody>{dpRows.map((c, i) => <tr key={c.id} className={`border-b border-stone-100 ${c.causal ? 'bg-teal-50 font-semibold' : ''}`}><td className="px-4 py-2"><Tex tex={`${c.hr.toFixed(2)}\\ \\mathrm{BPM}`} /> {c.causal && <span className="text-teal-700 text-[11px]">← decoded <Tex tex="\hat{h}_t" /></span>}{c.independent && !c.causal && <span className="text-red-600 text-[11px]"> · indep. argmax</span>}</td><td><Tex tex={c.emissionCost.toFixed(2)} /></td><td>{vitStep === 0 || c.predBpm === null ? <Tex tex="\text{—}" /> : <Tex tex={`${c.predBpm.toFixed(2)}\\ \\mathrm{BPM} \\;\\to\\; ${c.transCost.toFixed(2)}`} />}</td><td><Tex tex={c.dpCost.toFixed(2)} /></td></tr>)}</tbody></table>
-            <p className="px-4 py-2 text-[11px] text-stone-500">Stored DP costs. <Tex tex="\tilde{D}_t(k)" /> is the per-window normalised cost (best path <Tex tex="= 0" />); table order follows it. Predicted candidate error <Tex tex="\hat{e}_t(k)" /> for the decoded pick: <Tex tex={`${(dpRows.find(c => c.causal)?.predErr ?? 0).toFixed(2)}\\ \\mathrm{BPM}`} />.</p>
+            <p className="px-4 py-2 text-[11px] text-stone-500"><Tex tex="\tilde{D}_t(k)" /> is the per-window normalised DP cost (best path <Tex tex="= 0" />). Predicted error for the decoded pick: <Tex tex={`${(dpRows.find(c => c.causal)?.predErr ?? 0).toFixed(2)}\\ \\mathrm{BPM}`} />.</p>
           </div>
           <div>
             <figure className="figure"><ReplayTimeline windows={REPLAY.windows} upto={vitStep} /></figure>
@@ -247,7 +247,7 @@ function Playground() {
             <div key={i} className="bg-amber-50 border border-amber-100 rounded-lg py-3 px-2"><p className="font-serif text-xl font-medium text-stone-900">{v}</p><p className="text-[11px] text-stone-500 mt-0.5">{k}</p></div>))}
         </div>
         <p className="text-[13px] text-stone-600 mt-2">{POLICIES[policy].note}</p>
-        <p className="text-[12px] text-stone-500 mt-1">Coverage and MAE above are the paper's aggregate results. Below, the active threshold is applied to the Stage 4 replay (subject <Tex tex="\text{00001}" />).</p>
+        <p className="text-[12px] text-stone-500 mt-1">Below, the selected policy is applied to the Stage 4 replay.</p>
         <figure className="figure mt-4">
           <p className="font-semibold text-sm mb-1">Reliability per window — click a bar to inspect its features</p>
           <ReliabilityChart windows={REPLAY.windows} thresh={POLICIES[policy].thresh} decisions={decisions} selected={relSel} onSelect={setRelSel} />
@@ -294,13 +294,13 @@ function Evaluation() {
   const CW = 560, CH = 260, CX = (c: number) => 52 + ((100 - c) / 75) * (CW - 80), CY = (m: number) => CH - 36 - (m / 11) * (CH - 60)
   return (
     <section id="evaluation" className="max-w-6xl mx-auto px-5 py-16 scroll-mt-16">
-      <SectionHead kicker="Evaluation · Published results" title="What the paper reports" lede={<>All numbers in this section are the paper's reported values (primary: <MathNumbers text="31" />-subject motion-focused ring evaluation, <MathNumbers text="2,009" /> windows, <MathNumbers text="5" /> seeds). They are independent of the replay above.</>} />
+      <SectionHead kicker="Evaluation · Published results" title="What the paper reports" lede="Published results from the paper's motion-focused ring evaluation." />
 
       <h3 className="font-serif text-xl font-medium mt-2">Motion-robust HR estimation — Table <Tex tex="1" /> (<Tex tex="\mathrm{MAE,\ BPM}" />)</h3>
       <div className="mt-4 overflow-x-auto">
           <table className="w-full text-[13px]"><thead><tr className="text-left text-stone-500 border-b border-stone-300"><th className="px-4 py-2.5">Configuration</th><th className="px-2 py-2.5">Static</th><th className="px-2 py-2.5">Motion</th><th className="px-2 py-2.5">Overall</th></tr></thead>
             <tbody>{PUBLISHED.motionTable.map(r => <tr key={r.method} className={`border-t border-stone-100 ${r.method.includes('CITRUS') ? 'bg-teal-50 font-semibold' : ''}`}><td className="px-4 py-2.5">{r.method}</td><td className="px-2"><Tex tex={toTexExpr(r.static)} /></td><td className="px-2"><Tex tex={r.motion.toFixed(2)} /></td><td className="px-2"><Tex tex={toTexExpr(r.overall)} /></td></tr>)}</tbody></table>
-          <p className="text-[11px] text-stone-500 px-4 py-2"><Tex tex="\pm" /> = std over <Tex tex="5" /> seeds where reported. Platform: <MathNumbers text="54 participants, 49.76 h" /> vs. clinical references (<Tex tex="\tau" />-Ring); motion analysis on <MathNumbers text="31 subjects" />, ring-only inputs at runtime.</p>
+          <p className="text-[11px] text-stone-500 px-4 py-2"><Tex tex="\pm" /> = std over <Tex tex="5" /> seeds where reported.</p>
         </div>
       <p className="text-sm bg-teal-50 border border-teal-200 text-teal-900 rounded-lg px-4 py-3 mt-4"><b className="font-serif text-2xl"><Tex tex="-24\%" /></b> <span className="ml-1">motion MAE vs. the LSTM baseline (<Tex tex="14.39 \to 10.91\ \mathrm{BPM}" />). Static MAE reaches <Tex tex="2.63\ \mathrm{BPM}" />.</span></p>
 
@@ -339,7 +339,7 @@ function Evaluation() {
           </div>
           <div className="mt-auto pt-3 border-t border-white/10">
             <p className="text-[13px] text-stone-300">Improvement: <b className="text-white"><Tex tex="-2.35\ \mathrm{BPM}" /> MAE</b> <span className="text-stone-400">from causal decoding alone, before any window is withheld.</span></p>
-            <p className="text-[12px] text-stone-400 mt-2"><MathNumbers text={PUBLISHED.stress.windows} />, subject-disjoint splits. Heavy tails motivate temporal decoding and selective reporting.</p>
+            <p className="text-[12px] text-stone-400 mt-2">Heavy-tailed errors motivate temporal decoding and selective reporting.</p>
           </div>
         </div>
       </div>
@@ -362,9 +362,8 @@ function Evaluation() {
               <div key={k} className="bg-stone-50 rounded-lg py-4 px-2"><p className="font-serif text-xl font-medium text-stone-900"><Tex tex={toTexExpr(v)} /></p><p className="text-[11px] text-stone-500 mt-1"><MathNumbers text={k} /></p></div>))}
           </div>
           <ul className="text-[13px] text-stone-600 mt-4 space-y-1.5 list-disc pl-5">
-            <li>Median <MathNumbers text={PUBLISHED.deploy.median} /> · max <MathNumbers text="197.949 ms" /> over <MathNumbers text="60" /> warm inferences (<MathNumbers text="5" /> passes <Tex tex="\times" /> <MathNumbers text="12" /> windows); <MathNumbers text={PUBLISHED.deploy.heap} />.</li>
-            <li>Estimated inference energy <MathNumbers text={PUBLISHED.deploy.energy} /> Candidate/Viterbi selections match desktop on all <MathNumbers text="12" /> golden windows (max reliability <Tex tex="\Delta" /> <Tex tex="=" /> <MathNumbers text="3.815×10⁻⁶" />).</li>
-            <li><MathNumbers text={PUBLISHED.deploy.hw} /> — the benchmark covers the feature-vector inference core; raw-signal candidate generation runs on the host. A separate <MathNumbers text="100 Hz" /> live-sensing prototype streams waveforms and beat events to a browser UI.</li>
+            <li>Median latency <MathNumbers text={PUBLISHED.deploy.median} />; estimated energy <MathNumbers text={PUBLISHED.deploy.energy} /></li>
+            <li>On-device selections match desktop; a live-sensing prototype streams waveforms and beat events to a browser UI.</li>
           </ul>
         </div>
       </div>
@@ -398,7 +397,7 @@ function Paper() {
           <p className="text-sm text-stone-500 mt-4">Companion of the 2026 ACM International Joint Conference on Pervasive and Ubiquitous Computing · October 11–15, 2026 · Shanghai, China · 5 pages · CC BY 4.0</p>
           <div className="flex flex-wrap gap-2.5 mt-5">
             <a href="/citrus.pdf" className="px-5 py-2.5 rounded-full bg-blue-700 text-white text-sm font-semibold hover:bg-blue-800">Read the paper (PDF)</a>
-            <span className="px-5 py-2.5 rounded-full border border-dashed border-stone-300 text-sm text-stone-400">Code / data: authors' data package in reference/</span>
+            <span className="px-5 py-2.5 rounded-full border border-dashed border-stone-300 text-sm text-stone-400">Code / data: see reference/</span>
           </div>
         </div>
         <div className="min-w-0">
@@ -453,7 +452,7 @@ export default function App() {
       <Paper />
       <footer className="max-w-6xl mx-auto px-5 py-8 border-t border-stone-200 flex flex-wrap gap-3 justify-between text-[12px] text-stone-400">
         <span>CITRUS · UbiComp Companion ’26 · CC BY 4.0</span>
-        <span>Playground: stored windows (subject 00020), authors' HGB weights · Evaluation: results as reported in the paper</span>
+        <span>Playground: recorded data · Evaluation: published results</span>
       </footer>
     </div>
   )
