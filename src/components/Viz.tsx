@@ -160,8 +160,6 @@ export function PsdChart({ rec, win, sel, onSel }: { rec: Recording; win: Win; s
         {/* one label per HR cluster — guaranteed non-overlapping by layoutCandidateLabels */}
         {placed.map(p => <SvgTex key={`lab-${p.id}`} x={p.labelX} y={p.labelTop} w={p.w} tex={p.count > 1 ? `${p.c.hr.toFixed(2)}\\,\\text{×}${p.count}` : p.c.hr.toFixed(2)} color={p.c.isMotionPeak ? C.red : C.blue} size={11} bold />)}
       </svg>
-      <p className="figcap">Candidate HR (<Tex tex="\mathrm{BPM}" />) · solid fill = Welch PSD (IR / red) · dashed amber = autocorrelation · one marker per <Tex tex="2.5\ \mathrm{BPM}" /> cluster (up to <Tex tex="6" />)</p>
-      <p className="text-xs text-stone-500 mt-1.5">Under motion the <span className="text-red-600 font-semibold">tallest peak is limb-motion frequency</span>, not the pulse — the core ambiguity CITRUS resolves by scoring all hypotheses, not picking the max.</p>
     </div>
   )
 }
@@ -224,7 +222,7 @@ export function ReplayTimeline({ windows, upto, decisions }: { windows: ReplayWi
 
 /** Stage 5 figure: per-window reliability r_t against the active policy threshold. */
 export function ReliabilityChart({ windows, thresh, decisions, selected, onSelect }: { windows: ReplayWin[]; thresh: number; decisions: { d: string }[]; selected: number; onSelect: (i: number) => void }) {
-  const H = 230, X = (i: number) => 70 + (i / Math.max(1, windows.length - 1)) * (W - 130), Y = (r: number) => H - 36 - r * (H - 66), BW = 64
+  const H = 250, X = (i: number) => 70 + (i / Math.max(1, windows.length - 1)) * (W - 130), Y = (r: number) => H - 48 - r * (H - 78), BW = 64
   const col = (d: string) => d === 'accept' ? C.teal : d === 'hold' ? C.amber : '#dc2626'
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Reliability per replay window against the reporting threshold">
@@ -234,8 +232,8 @@ export function ReliabilityChart({ windows, thresh, decisions, selected, onSelec
       {windows.map((w, i) => <g key={i} onClick={() => onSelect(i)} className="cursor-pointer">
         <rect x={X(i) - BW / 2} y={Y(w.reliability)} width={BW} height={Y(0) - Y(w.reliability)} rx={3} fill={col(decisions[i].d)} opacity={i === selected ? 1 : 0.72} stroke={i === selected ? C.ink : 'none'} strokeWidth={i === selected ? 1.6 : 0} />
         <SvgTex x={X(i)} y={Y(w.reliability) - 24} w={52} tex={`r_{${i + 1}}=${w.reliability.toFixed(2)}`} color={col(decisions[i].d)} size={11} bold />
-        <SvgTex x={X(i)} y={H - 22} w={52} tex={`w_{${i + 1}}`} color={C.mute} size={10} />
-        <SvgTex x={X(i)} y={H - 8} w={86} tex={`\\text{${w.isMotion ? 'motion' : 'static'}}`} color={C.mute} size={9} />
+        <SvgTex x={X(i)} y={H - 30} w={52} tex={`w_{${i + 1}}`} color={C.mute} size={10} />
+        <SvgTex x={X(i)} y={H - 16} w={86} tex={`\\text{${w.isMotion ? 'motion' : 'static'}}`} color={C.mute} size={9} />
       </g>)}
     </svg>
   )
