@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { RECORDINGS, POLICIES, PUBLISHED, decide, fmtT, type Candidate, type PolicyKey } from './data'
-import { HeroCanvas, SignalExplorer, PsdChart, ViterbiGraph, HrTimeline, C } from './components/Viz'
+import { SignalExplorer, PsdChart, ViterbiGraph, HrTimeline, C } from './components/Viz'
 import { Tex, MathNumbers, toTexExpr } from './components/Math'
 
 const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -75,7 +75,7 @@ function Playground() {
       {/* ── STAGE 1 ── */}
       <article id="stage1" className="scroll-mt-36 border-t border-stone-200 pt-10 mt-10">
         <h3 className="font-serif text-2xl font-semibold"><span className="text-blue-700">Stage 1 ·</span> PPG Signal Explorer</h3>
-        <p className="text-stone-600 mt-2 max-w-3xl text-[15px] leading-relaxed">Ring PPG (25 Hz, infrared + red) with accelerometer. At rest the pulse dominates. Under squats, striding, or head shaking, limb motion changes sensor–skin coupling and injects artifacts <em>inside the cardiac band</em> — distorting the waveform until several heart rates become plausible. Compare <b>Rest</b> against <b>Deep squats</b> above.</p>
+        <p className="text-stone-600 mt-2 max-w-3xl text-[15px] leading-relaxed">Ring PPG (25 Hz, infrared + red) with accelerometer. At rest the pulse dominates. Under squats or striding, limb motion changes sensor–skin coupling and injects artifacts <em>inside the cardiac band</em> — distorting the waveform until several heart rates become plausible. Compare <b>Rest</b> against <b>Deep squats</b> above.</p>
         <div className="flex flex-wrap gap-4 mt-4 text-[13px]">
           {([['ir', 'Infrared PPG', C.blue], ['red', 'Red PPG', '#7c3aed'], ['acc', 'Accelerometer', C.amber], ['ref', 'Reference HR (eval only)', C.teal]] as const).map(([k, label, col]) => (
             <label key={k} className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={channels[k]} onChange={() => setChannels({ ...channels, [k]: !channels[k] })} className="accent-blue-700" /><span style={{ color: col }} className="font-semibold">{label}</span></label>))}
@@ -356,7 +356,7 @@ export default function App() {
           <button onClick={() => scrollTo('demo')} className="px-6 py-3 rounded-full bg-blue-700 text-white font-semibold text-sm hover:bg-blue-800 shadow-sm">Explore Interactive Demo ↓</button>
           <a href="/citrus.pdf" className="px-6 py-3 rounded-full border border-stone-300 font-semibold text-sm hover:border-blue-500">Paper PDF</a>
         </div>
-        <div className="border border-stone-200 rounded-2xl mt-9 px-4 pt-2 pb-1 bg-gradient-to-b from-white to-stone-50"><HeroCanvas /></div>
+        <div className="border border-stone-200 rounded-2xl mt-9 px-4 pt-2 pb-1 bg-gradient-to-b from-white to-stone-50"><img src="/citrus-hero.gif" width={1200} height={240} className="w-full h-auto block" alt="Animated CITRUS pipeline: noisy PPG and accelerometer scroll in, become about 140 candidate heart rates per window (motion cluster at 84 BPM, pulse cluster at 114 BPM), then a decoded heart-rate trace that is accepted, held, or rejected" /></div>
         <div className="grid md:grid-cols-4 gap-3 mt-6 text-center">
           {[['−24%', 'motion MAE vs LSTM: 14.39 → 10.91 BPM', C.teal], ['≈140', 'candidate hypotheses per 30 s window', C.blue], ['2.90 BPM', 'reported MAE at 31% motion coverage', C.amber], ['156.4 ms', 'ESP32-S3 inference-core latency / window', C.ink]].map(([v, k, col]) => (
             <div key={k} className="border border-stone-200 rounded-xl py-4 px-3"><p className="font-serif text-[26px] font-semibold" style={{ color: col as string }}><Tex tex={toTexExpr(v)} /></p><p className="text-[12px] text-stone-500 mt-1 leading-snug"><MathNumbers text={k} /></p></div>))}

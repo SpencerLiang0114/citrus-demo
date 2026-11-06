@@ -1,55 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { Recording, Win, Candidate } from '../data'
 import { fmtT } from '../data'
 import { Tex } from './Math'
 
 export const C = { blue: '#2563eb', teal: '#0d9488', amber: '#d97706', red: '#dc2626', ink: '#1c1917', mute: '#78716c', grid: '#e7e5e4' }
 const W = 860
-
-// ── Hero animated canvas ────────────────────────────────────────────────────
-export function HeroCanvas() {
-  const ref = useRef<HTMLCanvasElement>(null)
-  useEffect(() => {
-    const cv = ref.current!, ctx = cv.getContext('2d')!
-    let raf = 0, t0 = performance.now()
-    const draw = (now: number) => {
-      const t = (now - t0) / 1000, w = cv.width, h = cv.height
-      ctx.clearRect(0, 0, w, h)
-      // noisy PPG (left -> pipeline)
-      ctx.lineWidth = 2
-      const wave = (x: number, tt: number) => h * 0.30 + 16 * Math.sin(x * 0.05 + tt * 2) * Math.pow(Math.max(0, Math.sin(x * 0.028 + tt * 1.4)), 2) + 12 * Math.sin(x * 0.11 + tt * 3.1) + 5 * Math.sin(x * 0.31 + tt * 7)
-      ctx.strokeStyle = C.blue; ctx.beginPath()
-      for (let x = 0; x < w * 0.34; x += 3) { const y = wave(x, t); x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y) } ctx.stroke()
-      ctx.fillStyle = C.mute; ctx.font = '600 11px Inter,sans-serif'; ctx.fillText('NOISY PPG + ACC', 8, 18)
-      // candidate cloud
-      const cx = w * 0.52
-      ctx.fillText('≈140 CANDIDATES / WINDOW', cx - 70, 18)
-      const truth = h * 0.52
-      for (let i = 0; i < 26; i++) {
-        const yy = truth + Math.sin(i * 12.9898) * h * 0.30, xx = cx + Math.sin(i * 78.233 + t * 0.6) * 46
-        const isTruth = Math.abs(yy - truth) < 9
-        ctx.fillStyle = isTruth ? C.teal : i % 5 === 0 ? C.red : C.blue
-        ctx.globalAlpha = isTruth ? 1 : 0.55; ctx.beginPath(); ctx.arc(xx, yy, isTruth ? 5 : 3.5, 0, 7); ctx.fill()
-      }
-      ctx.globalAlpha = 1
-      // decoded path
-      ctx.strokeStyle = C.teal; ctx.lineWidth = 2.5; ctx.beginPath()
-      for (let x = w * 0.66; x < w * 0.97; x += 4) { const y = h * 0.52 + 10 * Math.sin(x * 0.02 + t * 1.2); x === w * 0.66 ? ctx.moveTo(x, y) : ctx.lineTo(x, y) } ctx.stroke()
-      ctx.fillStyle = C.teal; ctx.fillText('DECODED HR → ACCEPT / HOLD / REJECT', w * 0.66, 18)
-      const phase = (t % 3) / 3
-      const bx = w * 0.97, by = h * 0.52 + 10 * Math.sin(bx * 0.02 + t * 1.2)
-      ctx.fillStyle = phase < 0.6 ? C.teal : phase < 0.8 ? C.amber : C.red
-      ctx.beginPath(); ctx.arc(bx, by, 6 + 2 * Math.sin(t * 4), 0, 7); ctx.fill()
-      // connectors
-      ctx.strokeStyle = '#d6d3d1'; ctx.lineWidth = 1; ctx.setLineDash([4, 4])
-      ctx.beginPath(); ctx.moveTo(w * 0.34, h * 0.3); ctx.lineTo(cx - 55, h * 0.45); ctx.moveTo(cx + 55, h * 0.5); ctx.lineTo(w * 0.66, h * 0.52); ctx.stroke(); ctx.setLineDash([])
-      raf = requestAnimationFrame(draw)
-    }
-    raf = requestAnimationFrame(draw)
-    return () => cancelAnimationFrame(raf)
-  }, [])
-  return <canvas ref={ref} width={1160} height={190} className="w-full h-auto block" aria-label="Animated CITRUS pipeline: noisy PPG to candidates to decoded HR" />
-}
 
 // ── Signal explorer ─────────────────────────────────────────────────────────
 export function SignalExplorer({ rec, t, span, channels, onScrub }: { rec: Recording; t: number; span: number; channels: Record<string, boolean>; onScrub: (t: number) => void }) {

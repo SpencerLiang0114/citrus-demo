@@ -124,7 +124,6 @@ export const RECORDINGS: Recording[] = [
   buildRecording({ id: 'rest', label: 'Rest', sub: 'Seated, minimal motion', motion: 'Static', seed: 11, base: t => 64 + 3 * Math.sin(t / 90), motionBPM: 0, motionAmp: 0.03, noise: 0.06 }),
   buildRecording({ id: 'squats', label: 'Deep squats', sub: 'Squat cadence ≈ motion peak', motion: 'Deep-squat protocol', seed: 42, base: t => 98 + 22 * Math.sin(t / 120) + t / 18, motionBPM: 84, motionAmp: 0.62, noise: 0.16 }),
   buildRecording({ id: 'striding', label: 'Striding', sub: 'Step frequency inside cardiac band', motion: 'Striding protocol', seed: 77, base: t => 104 + 16 * Math.sin(t / 100 + 1), motionBPM: 112, motionAmp: 0.5, noise: 0.14 }),
-  buildRecording({ id: 'headshake', label: 'Head shaking', sub: 'Periodic head motion, ring on finger', motion: 'Shaking-head protocol', seed: 99, base: t => 72 + 6 * Math.sin(t / 80), motionBPM: 96, motionAmp: 0.44, noise: 0.15 }),
 ]
 
 export type PolicyKey = 'l30' | 'l8' | 'l4'
