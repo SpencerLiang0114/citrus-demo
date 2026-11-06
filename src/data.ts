@@ -82,13 +82,8 @@ function buildRecording(w: Win01): Recording {
 }
 export const RECORDINGS: Recording[] = W01.map(buildRecording)
 
-// ── Verified sequential replay (05_verified_HGB_replay) ─────────────────────
-// Five *consecutive* held-out windows (subject 00001, source indices 67–71:
-// two static "spo2" windows then three "deepsquat" windows), scored by the
-// authors' HGB model with the real causal DP already run. This is the only
-// sequential sequence in the data package, so Stage 4 (step decoder) and
-// Stage 5 (reliability timeline) run on it — the isolated subject-00020
-// windows above each contain a single window and cannot be stepped through.
+// ── Sequential replay (05_verified_HGB_replay): 5 consecutive held-out windows
+// (subject 00001, windows 67–71) with stored causal DP.
 interface ReplayCand01 {
   idx: number; bpm: number; predErr: number; prob: number; emissionCost: number
   dpCost: number; transCost: number; predIdx: number; predBpm: number | null
@@ -175,6 +170,6 @@ export const PUBLISHED = {
     { module: 'Reliability model', ablation: 'Feature ablation (AUC, err > 10 BPM)', result: 'PPG-only 0.898 · PPG+ACC 0.888 · ACC-only 0.710', detail: 'Accelerometer features do not improve reliability estimation; PPG quality + inter-estimator disagreement carry the signal.' },
     { module: 'Before decoding', ablation: 'Scorer output before Viterbi (5-seed primary)', result: '12.94 → 10.91 BPM motion MAE', detail: 'Primary evaluation (mean of 5 seeds): causal Viterbi removes physiologically implausible jumps left by per-window scoring.' },
   ],
-  deploy: { latency: '156.429 ms', median: '188.470 ms', p95: '197.943 ms', storage: '145,280 B', heap: '392,324 B min free heap', energy: '20.60–28.19 mJ / window (mean, datasheet est.)', hw: 'ESP32-S3 rev 0.2 @ 160 MHz · feature-vector inference core only — excludes raw filtering & candidate generation' },
+  deploy: { latency: '156.429 ms', median: '188.470 ms', p95: '197.943 ms', storage: '145,280 B', heap: '392,324 B min free heap', energy: '20.60–28.19 mJ / window (mean, datasheet est.)', hw: 'ESP32-S3 rev 0.2 @ 160 MHz · feature-vector inference core' },
 }
 export const fmtT = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
