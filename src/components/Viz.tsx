@@ -9,7 +9,7 @@ const W = 860
 // ── Signal explorer ─────────────────────────────────────────────────────────
 export function SignalExplorer({ rec, t, span, channels, onScrub }: { rec: Recording; t: number; span: number; channels: Record<string, boolean>; onScrub: (t: number) => void }) {
   const [hover, setHover] = useState<number | null>(null)
-  const H = 240, t1 = Math.max(0, Math.min(t - span / 2, 360 - span)), t2 = t1 + span
+  const H = 240, DUR = rec.series.at(-1)?.t ?? 360, t1 = Math.max(0, Math.min(t - span / 2, DUR - span)), t2 = t1 + span
   const pts = rec.series.filter(p => p.t >= t1 && p.t <= t2)
   const X = (tt: number) => ((tt - t1) / span) * W
   const ch = [
@@ -138,7 +138,7 @@ export function PsdChart({ rec, win, sel, onSel }: { rec: Recording; win: Win; s
 
 // ── Viterbi graph ───────────────────────────────────────────────────────────
 export function ViterbiGraph({ rec, upto, showIndep, showVit, showGT }: { rec: Recording; upto: number; showIndep: boolean; showVit: boolean; showGT: boolean }) {
-  const H = 330, X = (i: number) => 56 + (i / (rec.windows.length - 1)) * (W - 90), Y = (hr: number) => H - 34 - ((hr - 35) / 185) * (H - 60)
+  const H = 330, X = (i: number) => 56 + (i / Math.max(1, rec.windows.length - 1)) * (W - 90), Y = (hr: number) => H - 34 - ((hr - 35) / 185) * (H - 60)
   const path = (get: (w: Win) => number, color: string, uptoN: number, dash = '') => (
     <path d={rec.windows.slice(0, uptoN + 1).map((w, i) => `${i === 0 ? 'M' : 'L'}${X(i)},${Y(get(w))}`).join(' ')} fill="none" stroke={color} strokeWidth={2.4} strokeDasharray={dash} strokeLinejoin="round" />)
   return (
@@ -163,7 +163,7 @@ export function ViterbiGraph({ rec, upto, showIndep, showVit, showGT }: { rec: R
 
 // ── HR comparison timeline ──────────────────────────────────────────────────
 export function HrTimeline({ rec, upto, decisions }: { rec: Recording; upto: number; decisions?: { reported: number | null }[] }) {
-  const H = 170, X = (i: number) => 48 + (i / (rec.windows.length - 1)) * (W - 80), Y = (hr: number) => H - 30 - ((hr - 35) / 185) * (H - 52)
+  const H = 170, X = (i: number) => 48 + (i / Math.max(1, rec.windows.length - 1)) * (W - 80), Y = (hr: number) => H - 30 - ((hr - 35) / 185) * (H - 52)
   const line = (get: (w: Win) => number | null, color: string, dash = '') => {
     let d = '', pen = false
     rec.windows.slice(0, upto + 1).forEach((w, i) => { const v = get(w); if (v === null) { pen = false; return } d += `${pen ? 'L' : 'M'}${X(i)},${Y(v)} `; pen = true })

@@ -15,20 +15,21 @@ const SectionHead = ({ title, lede }: { kicker?: string; title: string; lede?: R
 function Playground() {
   const [recId, setRecId] = useState('squats')
   const rec = RECORDINGS.find(r => r.id === recId)!
-  const [t, setT] = useState(195)
+  const [t, setT] = useState(15)
   const [playing, setPlaying] = useState(false)
-  const [span, setSpan] = useState(120)
+  const [span, setSpan] = useState(30)
   const [channels, setChannels] = useState({ ir: true, red: true, acc: true, ref: true })
   const [selCand, setSelCand] = useState<Candidate | null>(null)
   const [scorer, setScorer] = useState<'MLP' | 'HGB'>('MLP')
-  const [vitStep, setVitStep] = useState(6)
+  const [vitStep, setVitStep] = useState(0)
   const [cmp, setCmp] = useState({ indep: true, vit: true, gt: true })
   const [policy, setPolicy] = useState<PolicyKey>('l8')
   const [expandedCand, setExpandedCand] = useState<string | null>(null)
 
-  useEffect(() => { if (!playing) return; const id = setInterval(() => setT(v => (v + 1 >= 360 ? 0 : v + 1)), 120); return () => clearInterval(id) }, [playing])
-  useEffect(() => { setSelCand(null); setVitStep(6) }, [recId])
-  const winIdx = Math.min(11, Math.floor(t / 30))
+  const DUR = rec.windows.length * 30
+  useEffect(() => { if (!playing) return; const id = setInterval(() => setT(v => (v + 1 >= DUR ? 0 : v + 1)), 120); return () => clearInterval(id) }, [playing, DUR])
+  useEffect(() => { setSelCand(null); setVitStep(0) }, [recId])
+  const winIdx = Math.min(rec.windows.length - 1, Math.floor(t / 30))
   const win = rec.windows[winIdx]
   const vitWin = rec.windows[vitStep]
 
@@ -42,7 +43,7 @@ function Playground() {
   const dpRows = vitWin.candidates.slice(0, 5).map(c => {
     let bestJ = rec.windows[Math.max(0, vitStep - 1)].candidates[0], bestVal = Infinity
     if (vitStep > 0) for (const j of rec.windows[vitStep - 1].candidates.slice(0, 5)) { const v = j.cost + 0.012 * (j.hr - c.hr) ** 2; if (v < bestVal) { bestVal = v; bestJ = j } }
-    return { c, bestJ, trans: vitStep === 0 ? 0 : Math.round(bestVal * 10) / 10, total: Math.round((c.cost + (vitStep === 0 ? 0 : bestVal)) * 10) / 10 }
+    return { c, bestJ, trans: vitStep === 0 ? 0 : Math.round(bestVal * 100) / 100, total: Math.round((c.cost + (vitStep === 0 ? 0 : bestVal)) * 100) / 100 }
   }).sort((a, b) => a.total - b.total)
 
   const stageBtn = (n: number, label: string) => (
@@ -51,7 +52,7 @@ function Playground() {
 
   return (
     <section id="demo" className="max-w-6xl mx-auto px-5 py-16 scroll-mt-20">
-      <SectionHead title="The Algorithm Playground" lede="One recording, one shared timeline, five synchronized stages. Scrub or press play — every view follows the same playhead. Replay data is a synthetic illustration from the paper's protocol; published results are in Evaluation." />
+      <SectionHead title="The Algorithm Playground" lede="One recording, one shared timeline, five synchronized stages. Scrub or press play — every view follows the same playhead. Replay data is the authors' real stored window for each condition (subject 00020), scored with their supplied HGB model; published results are in Evaluation." />
 
       {/* shared controls */}
       <div className="sticky top-14 z-30 bg-white/95 backdrop-blur border border-stone-200 rounded-xl p-4 shadow-sm mb-6">
@@ -62,12 +63,12 @@ function Playground() {
           <span className="text-xs text-stone-500">{rec.sub} · {rec.motion}</span>
           <div className="ml-auto flex items-center gap-2">
             <button onClick={() => setPlaying(!playing)} className="px-4 py-1.5 rounded-full bg-stone-900 text-white text-[13px] font-semibold hover:bg-stone-700">{playing ? '❚❚ Pause' : '▶ Play'}</button>
-            <span className="font-mono text-sm text-stone-700 w-20 text-center">{fmtT(t)} / 6:00</span>
+            <span className="font-mono text-sm text-stone-700 w-20 text-center">{fmtT(t)} / {fmtT(DUR)}</span>
           </div>
         </div>
-        <input type="range" min={0} max={359} value={t} onChange={e => setT(+e.target.value)} className="w-full mt-3 accent-blue-700" aria-label="Scrub timeline" />
+        <input type="range" min={0} max={DUR - 1} value={t} onChange={e => setT(+e.target.value)} className="w-full mt-3 accent-blue-700" aria-label="Scrub timeline" />
         <div className="flex gap-1 mt-1">{rec.windows.map(w => <button key={w.idx} onClick={() => setT(w.t0 + 15)} title={`Window ${w.idx + 1}`} className={`flex-1 h-2 rounded-full transition ${w.idx === winIdx ? 'bg-blue-700' : w.idx < winIdx ? 'bg-blue-200' : 'bg-stone-200'}`} />)}</div>
-        <p className="text-[11px] text-stone-500 mt-1.5">Window {winIdx + 1} of 12 · 30 s windows · reference HR in window: <b className="text-teal-700">{win.trueHR} BPM</b> (evaluation target only — never an inference input)</p>
+        <p className="text-[11px] text-stone-500 mt-1.5">Window {winIdx + 1} of {rec.windows.length} · 30 s windows · reference HR in window: <b className="text-teal-700">{win.trueHR} BPM</b> (evaluation target only — never an inference input)</p>
       </div>
 
       <div className="grid md:grid-cols-5 gap-2 mb-10">{stageBtn(1, 'PPG Signal Explorer')}{stageBtn(2, 'Candidate Generation')}{stageBtn(3, 'Candidate Scoring')}{stageBtn(4, 'Causal Viterbi Decoding')}{stageBtn(5, 'Reliability Reporting')}</div>
@@ -75,15 +76,15 @@ function Playground() {
       {/* ── STAGE 1 ── */}
       <article id="stage1" className="scroll-mt-36 border-t border-stone-200 pt-10 mt-10">
         <h3 className="font-serif text-2xl font-semibold"><span className="text-blue-700">Stage 1 ·</span> PPG Signal Explorer</h3>
-        <p className="text-stone-600 mt-2 max-w-3xl text-[15px] leading-relaxed">Ring PPG (25 Hz, infrared + red) with accelerometer. At rest the pulse dominates. Under squats or striding, limb motion changes sensor–skin coupling and injects artifacts <em>inside the cardiac band</em> — distorting the waveform until several heart rates become plausible. Compare <b>Rest</b> against <b>Deep squats</b> above.</p>
+        <p className="text-stone-600 mt-2 max-w-3xl text-[15px] leading-relaxed">Ring PPG (infrared + red, ≈100 Hz as stored) with accelerometer. At rest the pulse dominates. Under squats or striding, limb motion changes sensor–skin coupling and injects artifacts <em>inside the cardiac band</em> — distorting the waveform until several heart rates become plausible. Compare <b>Rest</b> against <b>Deep squats</b> above.</p>
         <div className="flex flex-wrap gap-4 mt-4 text-[13px]">
           {([['ir', 'Infrared PPG', C.blue], ['red', 'Red PPG', '#7c3aed'], ['acc', 'Accelerometer', C.amber], ['ref', 'Reference HR (eval only)', C.teal]] as const).map(([k, label, col]) => (
             <label key={k} className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={channels[k]} onChange={() => setChannels({ ...channels, [k]: !channels[k] })} className="accent-blue-700" /><span style={{ color: col }} className="font-semibold">{label}</span></label>))}
-          <label className="flex items-center gap-2 ml-auto">Zoom <input type="range" min={30} max={360} step={30} value={span} onChange={e => setSpan(+e.target.value)} className="accent-blue-700" /><span className="font-mono text-xs">{span}s</span></label>
+          <label className="flex items-center gap-2 ml-auto">Zoom <input type="range" min={5} max={30} step={5} value={span} onChange={e => setSpan(+e.target.value)} className="accent-blue-700" /><span className="font-mono text-xs">{span}s</span></label>
         </div>
         <div className="mt-3 border border-stone-200 rounded-xl p-3"><SignalExplorer rec={rec} t={t} span={span} channels={channels} onScrub={setT} /></div>
         <div className="grid md:grid-cols-3 gap-3 mt-4 text-[13px]">
-          {[['Motion amplitude', `${win.motionAmp.toFixed(2)} (norm.)`, win.motionAmp > 0.35 ? 'Severe — cardiac component may be non-identifiable in this window.' : 'Mild — pulse remains the dominant component.'], ['Motion frequency', win.motionFreqBPM ? `${win.motionFreqBPM} BPM-equiv.` : '—', win.motionFreqBPM ? 'Inside the 35–220 BPM candidate band: it will generate its own HR hypotheses.' : 'No periodic motion source.'], ['ACC role', 'Segment selection', 'ACC selects motion-quiet segments before spectral estimation. It is not a candidate source (paper §3.1).']].map(([k, v, d]) => (
+          {[['Motion amplitude', `${win.motionAmp.toFixed(1)} (ACC |a| std, stored counts)`, win.motionAmp > 20 ? 'Severe — cardiac component may be non-identifiable in this window.' : 'Mild — pulse remains the dominant component.'], ['Motion frequency', win.motionFreqBPM ? `${win.motionFreqBPM} BPM-equiv.` : '—', win.motionFreqBPM ? 'Inside the 35–220 BPM candidate band: it will generate its own HR hypotheses.' : 'No periodic motion source.'], ['ACC role', 'Segment selection', 'ACC selects motion-quiet segments before spectral estimation. It is not a candidate source (paper §3.1).']].map(([k, v, d]) => (
             <div key={k} className="bg-stone-50 rounded-lg p-3"><p className="text-[11px] font-bold tracking-wider text-stone-500 uppercase">{k}</p><p className="font-semibold text-stone-800 mt-0.5">{v}</p><p className="text-stone-500 mt-1">{d}</p></div>))}
         </div>
       </article>
@@ -101,7 +102,7 @@ function Playground() {
             <div><p className="text-[11px] font-bold text-blue-700 uppercase">Harmonic</p><p><Tex tex={selCand.harmonic === '—' ? '\\text{—}' : selCand.harmonic.replace('×', '\\times')} /> variant{selCand.isMotionPeak ? ' · motion peak' : ''}</p></div>
             <div><p className="text-[11px] font-bold text-blue-700 uppercase">vs. reference</p><p className={Math.abs(selCand.hr - win.trueHR) <= 5 ? 'text-teal-700 font-semibold' : 'text-red-600 font-semibold'}><Tex tex={`${selCand.hr - win.trueHR >= 0 ? '+' : ''}${selCand.hr - win.trueHR}\\ \\mathrm{BPM}`} /> {Math.abs(selCand.hr - win.trueHR) <= 5 ? '(plausible pulse)' : '(likely artifact / harmonic)'}</p></div>
           </div>
-        ) : <p className="text-[13px] text-stone-500 mt-2">Tip: in <b>Deep squats</b>, click the red marker near <Tex tex="84\ \mathrm{BPM}" /> — it has the highest spectral power yet sits <Tex tex="\sim 30\ \mathrm{BPM}" /> from the reference.</p>}
+        ) : <p className="text-[13px] text-stone-500 mt-2">Tip: in <b>Deep squats</b>, the strongest stored-quality candidate sits at <Tex tex="45.9\ \mathrm{BPM}" /> — some <Tex tex="35\ \mathrm{BPM}" /> from the <Tex tex="81\ \mathrm{BPM}" /> reference — yet the HGB ranker’s own predicted error for its top pick in this window is <Tex tex="\approx 16.7\ \mathrm{BPM}" />: every hypothesis looks unreliable, which is what Stage 5 is for.</p>}
       </article>
 
       {/* ── STAGE 3 ── */}
@@ -115,7 +116,7 @@ function Playground() {
             {(['MLP', 'HGB'] as const).map(s => <button key={s} onClick={() => setScorer(s)} className={`px-4 py-2 ${scorer === s ? 'bg-blue-700 text-white' : 'text-stone-600 hover:bg-stone-50'}`}>{s} scorer</button>)}
           </div>
         </div>
-        <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3"><MathNumbers text={scorer === 'MLP' ? 'MLP scorer (28k params) — used in the primary 31-subject evaluation. A raw-waveform CNN encoder added nothing (−0.01 BPM when removed, 85k → 28k params).' : 'HGB (histogram gradient-boosting) scorer — used in the sustained-motion stress test and the ESP32-S3 embedded configuration.'} /> Rankings below are illustrative for either scorer.</p>
+        <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3"><MathNumbers text={scorer === 'MLP' ? 'MLP scorer (28k params) — used in the primary 31-subject evaluation. A raw-waveform CNN encoder added nothing (−0.01 BPM when removed, 85k → 28k params).' : 'HGB (histogram gradient-boosting) scorer — used in the sustained-motion stress test and the ESP32-S3 embedded configuration.'} /> Rankings below are the supplied current-HGB model’s actual outputs on this real window (subject 00020, authors’ weights; not a held-out evaluation) shown for either toggle — per-candidate MLP outputs were not included in the data package.</p>
         <div className="mt-4 space-y-1.5">
           {win.candidates.slice(0, 8).map((c, i) => (
             <div key={c.id}>
@@ -129,9 +130,9 @@ function Playground() {
               </button>
               {expandedCand === c.id && (
                 <div className="mx-3 mb-2 px-4 py-3 bg-stone-50 rounded-b-lg grid grid-cols-2 md:grid-cols-5 gap-3 text-[12px]">
-                  {([['Spectral strength', c.feats.spectral], ['Estimator consensus', c.feats.consensus], ['Harmonic status', c.feats.harmonic], ['Source prior', c.feats.source], ['Temporal distance', c.feats.temporal]] as const).map(([k, v]) => (
+                  {([['Spectral quality', c.feats.spectral], ['Consensus density @5 BPM', c.feats.consensus], ['Consensus density @10 BPM', c.feats.harmonic], ['Weighted density @10 BPM', c.feats.source], ['Channel quality', c.feats.temporal]] as const).map(([k, v]) => (
                     <div key={k}><p className="text-stone-500">{k}</p><div className="h-2 bg-stone-200 rounded-full mt-1"><div className="h-full bg-blue-600 rounded-full" style={{ width: `${v * 100}%` }} /></div><p className="mt-0.5"><Tex tex={v.toFixed(2)} /></p></div>))}
-                  <p className="col-span-full text-stone-500">Candidate cost <Tex tex="E_t(k)" /> <Tex tex={`= ${(c.cost).toFixed(1)}`} /> (derived from scorer logit) — passed to the Viterbi decoder in Stage 4.</p>
+                  <p className="col-span-full text-stone-500">Candidate cost <Tex tex="E_t(k)" /> <Tex tex={`= ${(c.cost).toFixed(1)}`} /> (−log emission probability from the HGB scorer) — passed to the Viterbi decoder in Stage 4.</p>
                 </div>)}
             </div>))}
         </div>
@@ -147,9 +148,9 @@ function Playground() {
         </div>
         <div className="flex flex-wrap items-center gap-3 mt-4">
           <button onClick={() => setVitStep(v => Math.max(0, v - 1))} className="px-3 py-1.5 rounded-full border border-stone-300 text-[13px] font-semibold disabled:opacity-40" disabled={vitStep === 0}>← Prev window</button>
-          <button onClick={() => setVitStep(v => Math.min(11, v + 1))} className="px-4 py-1.5 rounded-full bg-teal-700 text-white text-[13px] font-semibold disabled:opacity-40" disabled={vitStep === 11}>Step decoder →</button>
-          <input type="range" min={0} max={11} value={vitStep} onChange={e => setVitStep(+e.target.value)} className="flex-1 min-w-[140px] accent-teal-700" aria-label="Viterbi frontier" />
-          <span className="text-sm">frontier: window <Tex tex={`${vitStep + 1} / 12`} /></span>
+          <button onClick={() => setVitStep(v => Math.min(rec.windows.length - 1, v + 1))} className="px-4 py-1.5 rounded-full bg-teal-700 text-white text-[13px] font-semibold disabled:opacity-40" disabled={vitStep === rec.windows.length - 1}>Step decoder →</button>
+          <input type="range" min={0} max={rec.windows.length - 1} value={vitStep} onChange={e => setVitStep(+e.target.value)} className="flex-1 min-w-[140px] accent-teal-700" aria-label="Viterbi frontier" />
+          <span className="text-sm">frontier: window <Tex tex={`${vitStep + 1} / ${rec.windows.length}`} /></span>
           <div className="flex gap-3 text-[12px] ml-auto">
             {([['indep', 'Independent', C.red], ['vit', 'Viterbi', C.teal], ['gt', 'Reference', C.ink]] as const).map(([k, l, col]) => <label key={k} className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={cmp[k]} onChange={() => setCmp({ ...cmp, [k]: !cmp[k] })} className="accent-teal-700" /><span style={{ color: col }} className="font-semibold">{l}</span></label>)}
           </div>
@@ -159,13 +160,13 @@ function Playground() {
           <div className="border border-stone-200 rounded-xl overflow-x-auto">
             <p className="px-4 py-2.5 bg-stone-50 font-semibold text-sm">Dynamic-programming table — window <Tex tex={String(vitStep + 1)} /> {vitStep === 0 ? <>(<Tex tex="D_1(k) = E_1(k)" />)</> : <>(best predecessor from window <Tex tex={String(vitStep)} />)</>}</p>
             <table className="w-full text-[13px]"><thead><tr className="text-left text-stone-500 border-b border-stone-200"><th className="px-4 py-2">Candidate <Tex tex="k" /></th><th><Tex tex="E_t(k)" /></th><th>Best <Tex tex="j \to" /> transition <Tex tex="\Omega" /></th><th><Tex tex="D_t(k)" /></th></tr></thead>
-              <tbody>{dpRows.map((r, i) => <tr key={r.c.id} className={`border-b border-stone-100 ${i === 0 ? 'bg-teal-50 font-semibold' : ''}`}><td className="px-4 py-2"><Tex tex={`${r.c.hr}\\ \\mathrm{BPM}`} /> {i === 0 && <span className="text-teal-700 text-[11px]">← decoded <Tex tex="\hat{h}_t" /></span>}</td><td><Tex tex={r.c.cost.toFixed(1)} /></td><td>{vitStep === 0 ? '—' : <Tex tex={`${r.bestJ.hr}\\ \\mathrm{BPM} \\to ${r.trans.toFixed(1)}`} />}</td><td><Tex tex={r.total.toFixed(1)} /></td></tr>)}</tbody></table>
+              <tbody>{dpRows.map((r, i) => <tr key={r.c.id} className={`border-b border-stone-100 ${i === 0 ? 'bg-teal-50 font-semibold' : ''}`}><td className="px-4 py-2"><Tex tex={`${r.c.hr}\\ \\mathrm{BPM}`} /> {i === 0 && <span className="text-teal-700 text-[11px]">← decoded <Tex tex="\hat{h}_t" /></span>}</td><td><Tex tex={r.c.cost.toFixed(2)} /></td><td>{vitStep === 0 ? '—' : <Tex tex={`${r.bestJ.hr}\\ \\mathrm{BPM} \\to ${r.trans.toFixed(1)}`} />}</td><td><Tex tex={r.total.toFixed(2)} /></td></tr>)}</tbody></table>
           </div>
           <div>
             <div className="border border-stone-200 rounded-xl p-3"><HrTimeline rec={rec} upto={vitStep} /></div>
             <div className="grid grid-cols-3 gap-3 mt-3 text-center">
-              {[['Independent argmax', `${(rec.windows.slice(0, vitStep + 1).reduce((s, w) => s + w.errIndep, 0) / (vitStep + 1)).toFixed(1)} BPM`, C.red], ['+ Causal Viterbi', `${(rec.windows.slice(0, vitStep + 1).reduce((s, w) => s + w.errVit, 0) / (vitStep + 1)).toFixed(1)} BPM`, C.teal], ['Windows decoded', `${vitStep + 1} / 12`, C.ink]].map(([k, v, col]) => (
-                <div key={k} className="bg-stone-50 rounded-lg py-3"><p className="font-serif text-xl font-semibold" style={{ color: col as string }}><Tex tex={toTexExpr(v)} /></p><p className="text-[11px] text-stone-500 mt-0.5">{k} MAE so far (illustrative)</p></div>))}
+              {[['Independent argmax', `${(rec.windows.slice(0, vitStep + 1).reduce((s, w) => s + w.errIndep, 0) / (vitStep + 1)).toFixed(1)} BPM`, C.red], ['+ Causal Viterbi', `${(rec.windows.slice(0, vitStep + 1).reduce((s, w) => s + w.errVit, 0) / (vitStep + 1)).toFixed(1)} BPM`, C.teal], ['Windows decoded', `${vitStep + 1} / ${rec.windows.length}`, C.ink]].map(([k, v, col]) => (
+                <div key={k} className="bg-stone-50 rounded-lg py-3"><p className="font-serif text-xl font-semibold" style={{ color: col as string }}><Tex tex={toTexExpr(v)} /></p><p className="text-[11px] text-stone-500 mt-0.5">{k} MAE so far (real window)</p></div>))}
             </div>
             <p className="text-[12px] text-stone-500 mt-3">Paper (primary, <Tex tex="5" /> seeds): scoring alone <Tex tex="12.94 \to" /> <b className="text-teal-700"><Tex tex="10.91\ \mathrm{BPM}" /></b> motion MAE after causal decoding. Fixed-run ablation: causal <Tex tex="10.66" /> vs. full-sequence <Tex tex="10.88\ \mathrm{BPM}" /> — causality costs nothing.</p>
           </div>
@@ -183,7 +184,7 @@ function Playground() {
           {([
             ['Reported coverage (paper, motion)', <Tex tex={toTexExpr(POLICIES[policy].coverage)} />],
             ['Reported-window MAE (paper)', <Tex tex={toTexExpr(POLICIES[policy].motionMAE)} />],
-            ['Windows reported here', <Tex tex={`${reportedCount} / 12`} />],
+            ['Windows reported here', <Tex tex={`${reportedCount} / ${rec.windows.length}`} />],
             [<span>Reject cost <Tex tex="\lambda_{\mathrm{rej}}" /></span>, <Tex tex={String(POLICIES[policy].lambda)} />],
           ] as [React.ReactNode, React.ReactNode][]).map(([k, v], i) => (
             <div key={i} className="bg-amber-50 border border-amber-100 rounded-xl py-3 px-2"><p className="font-serif text-xl font-semibold text-stone-900">{v}</p><p className="text-[11px] text-stone-500 mt-0.5">{k}</p></div>))}
@@ -223,7 +224,7 @@ function Evaluation() {
   const CW = 560, CH = 260, CX = (c: number) => 52 + ((100 - c) / 75) * (CW - 80), CY = (m: number) => CH - 36 - (m / 11) * (CH - 60)
   return (
     <section id="evaluation" className="max-w-6xl mx-auto px-5 py-16 scroll-mt-16">
-      <SectionHead kicker="Evaluation · Published results" title="What the paper reports" lede={<>All numbers in this section are the paper's reported values (primary: <MathNumbers text="31" />-subject motion-focused ring evaluation, <MathNumbers text="2,009" /> windows, <MathNumbers text="5" /> seeds). They are independent of the synthetic replay above.</>} />
+      <SectionHead kicker="Evaluation · Published results" title="What the paper reports" lede={<>All numbers in this section are the paper's reported values (primary: <MathNumbers text="31" />-subject motion-focused ring evaluation, <MathNumbers text="2,009" /> windows, <MathNumbers text="5" /> seeds). They are independent of the replay above.</>} />
 
       <h3 className="font-serif text-xl font-semibold mt-2">Motion-robust HR estimation — Table <Tex tex="1" /> (<Tex tex="\mathrm{MAE,\ BPM}" />)</h3>
       <div className="border border-stone-200 rounded-xl overflow-hidden mt-4">
@@ -244,7 +245,7 @@ function Evaluation() {
             {PUBLISHED.coverage.map((p, i) => <g key={i} onClick={() => setCovIdx(i)} className="cursor-pointer"><circle cx={CX(p.cov)} cy={CY(p.mae)} r={i === covIdx ? 9 : 6} fill={i === covIdx ? C.amber : '#fff'} stroke={C.amber} strokeWidth={2.4} /><SvgMath x={CX(p.cov)} y={CY(p.mae) - 22} w={76} tex={`${p.cov}\\% \\cdot ${p.mae}`} color={C.amber} bold /></g>)}
           </svg>
           <p className="text-center text-[11px] text-stone-500">Reported-window coverage (motion windows) <Tex tex="\to" /> · MAE (<Tex tex="\mathrm{BPM}" />) <Tex tex="\uparrow" /></p>
-          <label className="flex items-center gap-2 text-[13px] mt-2 cursor-pointer"><input type="checkbox" checked={showOverall} onChange={() => setShowOverall(!showOverall)} className="accent-amber-600" /> Show overall (static + motion) curve — dashed, values read from Fig. 2 shape</label>
+          <label className="flex items-center gap-2 text-[13px] mt-2 cursor-pointer"><input type="checkbox" checked={showOverall} onChange={() => setShowOverall(!showOverall)} className="accent-amber-600" /> Show overall (static + motion) curve — dashed, exact points from ring_p13_coverage-summary.csv</label>
         </div>
         <div>
           <div className="bg-stone-900 text-white rounded-xl p-5">
@@ -313,7 +314,7 @@ function Paper() {
           <p className="text-sm text-stone-500 mt-4">Companion of the 2026 ACM International Joint Conference on Pervasive and Ubiquitous Computing · October 11–15, 2026 · Shanghai, China · 5 pages · CC BY 4.0</p>
           <div className="flex flex-wrap gap-2.5 mt-5">
             <a href="/citrus.pdf" className="px-5 py-2.5 rounded-full bg-blue-700 text-white text-sm font-semibold hover:bg-blue-800">Read the paper (PDF)</a>
-            <span className="px-5 py-2.5 rounded-full border border-dashed border-stone-300 text-sm text-stone-400">Code / data: not included with the paper PDF</span>
+            <span className="px-5 py-2.5 rounded-full border border-dashed border-stone-300 text-sm text-stone-400">Code / data: authors’ real data package in reference/ (replayed above)</span>
           </div>
         </div>
         <div className="min-w-0">
@@ -368,7 +369,7 @@ export default function App() {
       <Paper />
       <footer className="max-w-6xl mx-auto px-5 py-8 border-t border-stone-200 flex flex-wrap gap-3 justify-between text-[12px] text-stone-400">
         <span>CITRUS · UbiComp Companion ’26 · CC BY 4.0</span>
-        <span>Playground data: synthetic illustration from the paper protocol · Published results: verbatim from the paper</span>
+        <span>Playground data: real stored windows (subject 00020) scored with the authors’ supplied HGB weights · Published results: verbatim from the paper</span>
       </footer>
     </div>
   )

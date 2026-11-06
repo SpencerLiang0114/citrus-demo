@@ -13,9 +13,13 @@ pnpm build       # production build -> dist/
 ```
 
 ## Data honesty
-No dataset or code accompanied `citrus.pdf`, so the Algorithm Playground uses
-deterministic synthetic data generated from the paper's described protocol
-(30 s windows, IR/red PPG + ACC, ~140 candidates in [35,220] BPM, harmonics),
-clearly labeled as illustrative. Every number in Evaluation / Paper is a
-published value reproduced verbatim and kept separate from replay data.
+The authors' real data package lives in `reference/` (see
+`reference/README_先读.txt`); the playground no longer uses synthetic data.
+`scripts/build_real_data.py` builds `src/real-data.json` from it: the three
+stored windows (subject 00020) with their frozen candidates, scored by
+running the supplied current-HGB weights (self-checked against the verified
+05 replay — decoded HR exact, reliability within 1e-5; subject 00020 is not
+the held-out subject, so this is model output, not a held-out evaluation).
+Coverage curves in Evaluation are the exact `ring_p13_coverage-summary.csv`
+points; other Evaluation numbers are the paper's published values.
 `public/citrus.pdf` serves the paper itself.
