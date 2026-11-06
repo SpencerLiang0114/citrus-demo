@@ -17,14 +17,14 @@ export interface Win {
 }
 export interface Recording {
   id: string; label: string; sub: string; motion: string; nWindows: number
-  trueBase: number; windows: Win[]
-  series: { t: number; ir: number; red: number; acc: number; refHR: number }[]
+  trueBase: number; ppgBandHz: [number, number]; windows: Win[]
+  series: { t: number; ir: number; red: number; ax: number; ay: number; az: number; refHR: number }[]
   psd: { bpm: number; ir: number; red: number }[]
   autocorr: { lagBPM: number; v: number }[]
 }
 
 interface Win01 {
-  id: string; label: string; subject: string; fsHz: number; refHR: number; accStd: number; accPeakBpm: number
+  id: string; label: string; subject: string; fsHz: number; refHR: number; ppgBandHz: [number, number]; accStd: number; accPeakBpm: number
   baseHR: number; decodedHR: number; reliability: number
   wave: { t: number[]; ir: number[]; red: number[]; ax: number[]; ay: number[]; az: number[] }
   psd: { bpm: number[]; ir: number[]; red: number[] }
@@ -50,9 +50,13 @@ const REC_META: Record<string, { id: string; label: string; sub: string; motion:
 function buildRecording(w: Win01): Recording {
   const meta = REC_META[w.id]
   const motionFreqBPM = w.accStd >= 20 ? w.accPeakBpm : 0 // ACC spectral peak only where stored ACC actually moves
+  // All wave channels are preprocessed (band-passed 0.55–4 Hz,
+  // scripts/build_real_data.py): PPG ir/red plus the three ACC axes ax/ay/az.
+  // motionAmp/motionFreqBPM below still come from raw |a| (w.accStd/accPeakBpm),
+  // which is what the pipeline's slice selection uses.
   const series = w.wave.t.map((t, i) => ({
     t, ir: w.wave.ir[i], red: w.wave.red[i],
-    acc: Math.hypot(w.wave.ax[i], w.wave.ay[i], w.wave.az[i]), refHR: w.refHR,
+    ax: w.wave.ax[i], ay: w.wave.ay[i], az: w.wave.az[i], refHR: w.refHR,
   }))
   const candidates: Candidate[] = w.candidates.map(c => ({
     id: `${w.id}-${c.idx}`, hr: c.bpm, method: METHOD_MAP[c.method] ?? 'Welch PSD', channel: c.channel,
@@ -71,6 +75,7 @@ function buildRecording(w: Win01): Recording {
   }
   return {
     id: meta.id, label: meta.label, sub: meta.sub, motion: meta.motion, nWindows: 1, trueBase: w.refHR,
+    ppgBandHz: w.ppgBandHz ?? [0.55, 4],
     windows: [win], series,
     psd: w.psd.bpm.map((bpm, i) => ({ bpm, ir: w.psd.ir[i], red: w.psd.red[i] })),
     autocorr: w.autocorrBpm.map((lagBPM, i) => ({ lagBPM, v: w.autocorr[i] })),

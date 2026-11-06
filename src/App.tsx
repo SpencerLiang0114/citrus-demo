@@ -45,7 +45,21 @@ function Playground() {
   const [relSel, setRelSel] = useState(2)
 
   const DUR = rec.windows.length * 30
-  useEffect(() => { if (!playing) return; const id = setInterval(() => setT(v => (v + 1 >= DUR ? 0 : v + 1)), 120); return () => clearInterval(id) }, [playing, DUR])
+  // Continuous playback: advance by real elapsed time each animation frame
+  // (half the old 1 s-per-120 ms step rate, and no per-second jumps).
+  useEffect(() => {
+    if (!playing) return
+    let raf = 0, last: number | null = null
+    const RATE = 1000 / 240 // data-seconds per real second (half the previous rate)
+    const frame = (now: number) => {
+      if (last === null) last = now
+      const dt = Math.min(now - last, 100); last = now // cap jumps after tab switches
+      setT(v => { const n = v + (dt / 1000) * RATE; return n >= DUR ? n - DUR : n })
+      raf = requestAnimationFrame(frame)
+    }
+    raf = requestAnimationFrame(frame)
+    return () => cancelAnimationFrame(raf)
+  }, [playing, DUR])
   useEffect(() => { setSelCand(null); setVitStep(0) }, [recId])
   useEffect(() => {
     if (!vitPlaying) return
@@ -81,7 +95,7 @@ function Playground() {
             <span className="font-mono text-[13px] text-stone-700 w-20 text-center">{fmtT(t)} / {fmtT(DUR)}</span>
           </div>
         </div>
-        <input type="range" min={0} max={DUR - 1} value={t} onChange={e => setT(+e.target.value)} className="range mt-1" aria-label="Scrub timeline" />
+        <input type="range" min={0} max={DUR - 1} step={0.05} value={t} onChange={e => setT(+e.target.value)} className="range mt-1" aria-label="Scrub timeline" />
         <p className="text-[11px] text-stone-500">Window <Tex tex={`${winIdx + 1} \\;/\\; ${rec.windows.length}`} /> · <Tex tex="30\ \mathrm{s}" /> windows · reference HR in window: <b className="text-teal-700"><Tex tex={`${win.trueHR.toFixed(2)}\\ \\mathrm{BPM}`} /></b> (evaluation only)</p>
       </div>
 
@@ -93,11 +107,11 @@ function Playground() {
 
       {/* ── STAGE 1 ── */}
       <article id="stage1" className="stage">
-        <StageHead n={1} title="PPG signal explorer">Ring PPG (infrared + red, <Tex tex="\approx 100\ \mathrm{Hz}" />) and accelerometer, on the same clock. At rest the pulse is clear; during movement, artifacts overlap the cardiac band and the heart rate becomes ambiguous.</StageHead>
+        <StageHead n={1} title="PPG signal explorer">Ring PPG (infrared + red, <Tex tex="\approx 100\ \mathrm{Hz}" />) and accelerometer, on the same clock — shown after preprocessing: every channel band-passed <Tex tex="0.55\text{–}4\ \mathrm{Hz}" /> (3rd-order Butterworth, zero-phase, the filter candidate generation uses), with the three accelerometer axes <Tex tex="a_x, a_y, a_z" /> drawn separately. At rest the pulse is clear; during movement, artifacts overlap the cardiac band and the heart rate becomes ambiguous.</StageHead>
         <figure className="figure">
-          <div className="fig-title"><span>Recorded signals</span><label className="fig-sub flex items-center gap-2">Zoom <input type="range" min={5} max={30} step={5} value={span} onChange={e => setSpan(+e.target.value)} className="range" style={{ width: 110 }} aria-label="Zoom, window length in seconds" /><span><Tex tex={`${span}\\ \\mathrm{s}`} /></span></label></div>
+          <div className="fig-title"><span>Preprocessed signals</span><label className="fig-sub flex items-center gap-2">Zoom <input type="range" min={5} max={30} step={5} value={span} onChange={e => setSpan(+e.target.value)} className="range" style={{ width: 110 }} aria-label="Zoom, window length in seconds" /><span><Tex tex={`${span}\\ \\mathrm{s}`} /></span></label></div>
           <SignalExplorer rec={rec} t={t} span={span} channels={channels} onScrub={setT} />
-          <FigCap label="Stage 1 · Signals.">Hover for the nearest stored sample; click to move the cursor (dark line). The shaded band is the current <Tex tex="30\ \mathrm{s}" /> window that Stages 2–3 analyse.</FigCap>
+          <FigCap label="Stage 1 · Signals.">Hover for the nearest sample; click to move the cursor (dark line). The three accelerometer axes are overlaid on one common scale in a single lane. All five channels are band-passed (applied to the full <Tex tex="30\ \mathrm{s}" /> window for display; the pipeline filters its selected <Tex tex="4\ \mathrm{s}" /> slices) — for the accelerometer axes this removes the gravity/orientation offset. The motion statistics below are computed from raw <Tex tex="|a|" />, as in slice selection.</FigCap>
         </figure>
         <div className="stat-grid sm:grid-cols-3">
           <Stat label="Motion amplitude"><Tex tex={`\\sigma_{|a|} = ${win.motionAmp.toFixed(2)}`} /> <span className="font-normal text-stone-500">(ACC magnitude std, stored counts)</span></Stat>

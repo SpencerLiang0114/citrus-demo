@@ -7,19 +7,26 @@ export const C = { blue: '#2563eb', teal: '#0d9488', amber: '#d97706', red: '#dc
 const W = 860
 
 // ── Signal explorer ─────────────────────────────────────────────────────────
+// Light lanes as elsewhere on the page; the three accelerometer axes are
+// overlaid as separate traces on one common scale in a single lane.
+const ACC_AXES = [
+  { key: 'ax', color: C.red, tip: '#fca5a5' }, { key: 'ay', color: C.teal, tip: '#5eead4' }, { key: 'az', color: C.amber, tip: '#fcd34d' },
+] as const
 export function SignalExplorer({ rec, t, span, channels, onScrub }: { rec: Recording; t: number; span: number; channels: Record<string, boolean>; onScrub: (t: number) => void }) {
   const [hover, setHover] = useState<number | null>(null)
   const H = 240, DUR = rec.series.at(-1)?.t ?? 360, t1 = Math.max(0, Math.min(t - span / 2, DUR - span)), t2 = t1 + span
   const pts = rec.series.filter(p => p.t >= t1 && p.t <= t2)
   const X = (tt: number) => ((tt - t1) / span) * W
-  const ch = [
-    { key: 'ir', label: 'Infrared PPG', color: C.blue, vals: pts.map(p => p.ir), show: channels.ir },
-    { key: 'red', label: 'Red PPG', color: '#7c3aed', vals: pts.map(p => p.red), show: channels.red },
-    { key: 'acc', label: 'Accelerometer |a|', color: C.amber, vals: pts.map(p => p.acc), show: channels.acc },
-  ].filter(c => c.show)
-  const laneH = ch.length ? (H - 18) / ch.length : H
-  const laneY = (li: number, v: number) => { const c = ch[li]; const mn = Math.min(...c.vals), rg = (Math.max(...c.vals) - mn) || 1; return 8 + li * laneH + laneH - 18 - ((v - mn) / rg) * (laneH - 34) }
-  // Nearest stored sample to the cursor — the tooltip reports its real values, not interpolated ones.
+  const lanes = [
+    { key: 'ir', label: 'Infrared PPG · band-passed', show: channels.ir, traces: [{ key: 'ir', label: '', color: C.blue, vals: pts.map(p => p.ir) }] },
+    { key: 'red', label: 'Red PPG · band-passed', show: channels.red, traces: [{ key: 'red', label: '', color: '#7c3aed', vals: pts.map(p => p.red) }] },
+    { key: 'acc', label: 'Accelerometer · band-passed', show: channels.acc, traces: ACC_AXES.map(a => ({ key: a.key, label: a.key, color: a.color, vals: pts.map(p => p[a.key]) })) },
+  ].filter(l => l.show)
+  const laneH = lanes.length ? (H - 18) / lanes.length : H
+  // Common scale within a lane so overlaid traces (the ACC axes) stay comparable.
+  const laneScale = lanes.map(l => { const all = l.traces.flatMap(tr => tr.vals); const mn = Math.min(...all); return { mn, rg: (Math.max(...all) - mn) || 1 } })
+  const laneY = (li: number, v: number) => { const { mn, rg } = laneScale[li]; return 8 + li * laneH + laneH - 18 - ((v - mn) / rg) * (laneH - 34) }
+  // Nearest stored sample to the cursor — the tooltip reports its preprocessed values, not interpolated ones.
   let hovIdx = -1
   if (hover !== null && pts.length) { let best = Infinity; pts.forEach((p, i) => { const d = Math.abs(p.t - hover); if (d < best) { best = d; hovIdx = i } }) }
   const hov = hovIdx >= 0 ? pts[hovIdx] : null
@@ -32,33 +39,35 @@ export function SignalExplorer({ rec, t, span, channels, onScrub }: { rec: Recor
           onMouseMove={e => setHover(fromEvent(e))}
           onMouseLeave={() => setHover(null)}
           onClick={e => onScrub(fromEvent(e))}>
-          {ch.map((c, li) => {
-            const mn = Math.min(...c.vals), mx = Math.max(...c.vals), rg = (mx - mn) || 1, y0 = 8 + li * laneH
-            const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${X(p.t).toFixed(1)},${(y0 + laneH - 18 - ((c.vals[i] - mn) / rg) * (laneH - 34)).toFixed(1)}`).join(' ')
-            return <g key={c.key}>
-              <rect x={0} y={y0 + 2} width={W} height={laneH - 10} rx={6} fill="#f8fafc" />
-              <text x={8} y={y0 + 14} fontSize={10} fontWeight={600} fill={c.color}>{c.label}</text>
+          {lanes.map((l, li) => {
+            const { mn, rg } = laneScale[li], y0 = 8 + li * laneH
+            return <g key={l.key}>
+              <rect x={0} y={y0 + 2} width={W} height={laneH - 10} rx={6} fill="#fff" stroke={C.grid} />
+              <text x={8} y={y0 + 14} fontSize={10} fontWeight={600} fill={l.traces[0].color}>{l.label}</text>
+              {/* overlaid-trace legend (ACC axes) at the lane's top right */}
+              {l.traces.length > 1 && l.traces.map((tr, ti) => <g key={`lg-${tr.key}`}>
+                <line x1={W - 118 + ti * 40} x2={W - 106 + ti * 40} y1={y0 + 11} y2={y0 + 11} stroke={tr.color} strokeWidth={2} />
+                <text x={W - 103 + ti * 40} y={y0 + 14.5} fontSize={9.5} fontWeight={600} fill={tr.color}>{tr.label}</text>
+              </g>)}
               <line x1={0} x2={W} y1={y0 + laneH - 8} y2={y0 + laneH - 8} stroke={C.grid} />
-              <path d={path} fill="none" stroke={c.color} strokeWidth={1.5} strokeLinejoin="round" />
-              {/* selected-window shading */}
-              <rect x={X(Math.floor(t / 30) * 30)} y={y0 + 2} width={X(Math.floor(t / 30) * 30 + 30) - X(Math.floor(t / 30) * 30)} height={laneH - 12} fill={C.blue} opacity={0.05} />
+              {l.traces.map(tr => <path key={tr.key} d={pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${X(p.t).toFixed(1)},${(y0 + laneH - 18 - ((tr.vals[i] - mn) / rg) * (laneH - 34)).toFixed(1)}`).join(' ')} fill="none" stroke={tr.color} strokeWidth={1.5} strokeLinejoin="round" />)}
             </g>
           })}
           <line x1={X(t)} x2={X(t)} y1={0} y2={H} stroke={C.ink} strokeWidth={1.2} />
           {hov && <g>
             <line x1={X(hov.t)} x2={X(hov.t)} y1={0} y2={H} stroke={C.mute} strokeDasharray="3 3" />
-            {ch.map((c, li) => <circle key={c.key} cx={X(hov.t)} cy={laneY(li, c.vals[hovIdx])} r={4} fill={c.color} stroke="#fff" strokeWidth={1.6} />)}
+            {lanes.map((l, li) => l.traces.map(tr => <circle key={tr.key} cx={X(hov.t)} cy={laneY(li, tr.vals[hovIdx])} r={4} fill={tr.color} stroke="#fff" strokeWidth={1.6} />))}
           </g>}
         </svg>
         {hov && (
           <div className="absolute top-1 z-10 pointer-events-none bg-stone-900/95 text-white rounded-lg px-3 py-2 shadow-lg min-w-[168px]" style={{ left: `${hovPct}%`, transform: `translateX(${hovPct > 68 ? 'calc(-100% - 10px)' : '10px'})` }} role="status">
             <p className="text-[11px] font-bold text-stone-300">{fmtT(hov.t)} · t = {hov.t.toFixed(2)} s</p>
             <div className="mt-1 space-y-0.5 text-[12px]">
-              {channels.ir && <p className="flex justify-between gap-4"><span style={{ color: '#93c5fd' }}>Infrared PPG</span><b className="font-mono font-semibold">{Math.round(hov.ir).toLocaleString('en-US')}</b></p>}
-              {channels.red && <p className="flex justify-between gap-4"><span style={{ color: '#c4b5fd' }}>Red PPG</span><b className="font-mono font-semibold">{Math.round(hov.red).toLocaleString('en-US')}</b></p>}
-              {channels.acc && <p className="flex justify-between gap-4"><span style={{ color: '#fcd34d' }}>Accelerometer |a|</span><b className="font-mono font-semibold">{hov.acc.toFixed(1)}</b></p>}
+              {channels.ir && <p className="flex justify-between gap-4"><span style={{ color: '#93c5fd' }}>Infrared PPG</span><b className="font-mono font-semibold">{hov.ir.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</b></p>}
+              {channels.red && <p className="flex justify-between gap-4"><span style={{ color: '#c4b5fd' }}>Red PPG</span><b className="font-mono font-semibold">{hov.red.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</b></p>}
+              {channels.acc && ACC_AXES.map(a => <p key={a.key} className="flex justify-between gap-4"><span style={{ color: a.tip }}>Accelerometer {a.key}</span><b className="font-mono font-semibold">{hov[a.key].toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</b></p>)}
             </div>
-            <p className="text-[10px] text-stone-400 mt-1">nearest stored sample · raw counts</p>
+            <p className="text-[10px] text-stone-400 mt-1">nearest sample · all channels band-passed {rec.ppgBandHz[0]}–{rec.ppgBandHz[1]} Hz</p>
           </div>
         )}
       </div>
