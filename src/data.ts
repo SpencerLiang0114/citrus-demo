@@ -131,10 +131,10 @@ export const REPLAY: { windows: ReplayWin[]; lambdaTransition: number; threshold
 }
 
 export type PolicyKey = 'l30' | 'l8' | 'l4'
-export const POLICIES: Record<PolicyKey, { label: string; suffix: string; lambda: number; coverage: string; motionMAE: string; note: string; thresh: number }> = {
-  l30: { label: 'λrej = 30 · full coverage', suffix: 'full coverage', lambda: 30, coverage: '100%', motionMAE: '9.99 BPM', note: 'Policy emits every window — accepts or holds through unreliable stretches.', thresh: 0.18 },
-  l8: { label: 'λrej = 8 · balanced', suffix: 'balanced', lambda: 8, coverage: '~50–70%', motionMAE: '6.2 BPM @ 50%', note: 'Rejects the least reliable windows; holds briefly before rejecting.', thresh: 0.45 },
-  l4: { label: 'λrej = 4 · spot-check', suffix: 'spot-check', lambda: 4, coverage: '31%', motionMAE: '2.90 BPM', note: 'High-confidence spot measurements only — comparable to static-window accuracy.', thresh: 0.68 },
+export const POLICIES: Record<PolicyKey, { label: string; suffix: string; lambda: number; coverage: string; motionMAE: string; thresh: number }> = {
+  l30: { label: 'λrej = 30 · full coverage', suffix: 'full coverage', lambda: 30, coverage: '100%', motionMAE: '9.99 BPM', thresh: 0.18 },
+  l8: { label: 'λrej = 8 · balanced', suffix: 'balanced', lambda: 8, coverage: '~50–70%', motionMAE: '6.2 BPM @ 50%', thresh: 0.45 },
+  l4: { label: 'λrej = 4 · spot-check', suffix: 'spot-check', lambda: 4, coverage: '31%', motionMAE: '2.90 BPM', thresh: 0.68 },
 }
 export type Decision = 'accept' | 'hold' | 'reject'
 export function decide(w: Win, thresh: number, prevDecision: Decision | null, heldHR: number | null): { d: Decision; reported: number | null } {

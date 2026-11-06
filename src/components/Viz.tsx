@@ -62,7 +62,7 @@ export function SignalExplorer({ rec, t, span, channels, onScrub }: { rec: Recor
           </div>
         )}
       </div>
-      <div className="flex justify-between text-[11px] text-stone-500"><span>{fmtT(t1)}</span><span>playhead {fmtT(t)} · hover for real values · click chart to scrub · shaded = selected 30 s window</span><span>{fmtT(t2)}</span></div>
+      <div className="flex justify-between text-[11px] text-stone-500"><span>{fmtT(t1)}</span><span>{fmtT(t2)}</span></div>
     </div>
   )
 }

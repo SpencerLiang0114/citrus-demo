@@ -18,7 +18,7 @@ function Playground() {
   const [t, setT] = useState(15)
   const [playing, setPlaying] = useState(false)
   const [span, setSpan] = useState(30)
-  const [channels, setChannels] = useState({ ir: true, red: true, acc: true, ref: true })
+  const channels = { ir: true, red: true, acc: true, ref: true }
   const [selCand, setSelCand] = useState<Candidate | null>(null)
   const [scorer, setScorer] = useState<'MLP' | 'HGB'>('MLP')
   // One step = one window: each step advances the frontier by a whole w_t.
@@ -60,7 +60,7 @@ function Playground() {
 
   return (
     <section id="demo" className="max-w-6xl mx-auto px-5 py-16 scroll-mt-20">
-      <SectionHead title="The Algorithm Playground" lede="Five synchronized stages on one shared timeline. Scrub or press play — every view follows the same playhead." />
+      <SectionHead title="The Algorithm Playground" lede="Explore five synchronized stages. Scrub or play to see them evolve together." />
 
       {/* shared controls */}
       <div className="sticky top-14 z-30 bg-white/95 backdrop-blur rounded-lg p-4 mb-6">
@@ -83,16 +83,17 @@ function Playground() {
       {/* ── STAGE 1 ── */}
       <article id="stage1" className="scroll-mt-36 border-t border-stone-200 pt-10 mt-10">
         <h3 className="font-serif text-2xl font-medium"><span className="text-blue-700">Stage 1 ·</span> PPG Signal Explorer</h3>
-        <p className="text-stone-600 mt-2 max-w-3xl text-[15px] leading-relaxed">Ring PPG (infrared + red, <Tex tex="\approx 100\ \mathrm{Hz}" /> as stored) with accelerometer. At rest the pulse dominates. Under squats or striding, limb motion changes sensor–skin coupling and injects artifacts <em>inside the cardiac band</em> — distorting the waveform until several heart rates become plausible. Compare <b>Rest</b> against <b>Deep squats</b> above.</p>
+
+        <p className="text-stone-600 mt-2 max-w-3xl text-[15px] leading-relaxed">
+          Ring PPG (infrared + red, <Tex tex="\approx 100\ \mathrm{Hz}" />) and accelerometer. At rest, pulse signals are clear; during movement, artifacts overlap the cardiac band, making heart rate ambiguous.
+        </p>
         <div className="flex flex-wrap gap-4 mt-4 text-[13px]">
-          {([['ir', 'Infrared PPG', C.blue], ['red', 'Red PPG', '#7c3aed'], ['acc', 'Accelerometer', C.amber]] as const).map(([k, label, col]) => (
-            <label key={k} className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={channels[k]} onChange={() => setChannels({ ...channels, [k]: !channels[k] })} className="accent-blue-700" /><span style={{ color: col }} className="font-semibold">{label}</span></label>))}
           <label className="flex items-center gap-2 ml-auto">Zoom <input type="range" min={5} max={30} step={5} value={span} onChange={e => setSpan(+e.target.value)} className="accent-blue-700" /><span className="text-xs"><Tex tex={`${span}\\ \\mathrm{s}`} /></span></label>
         </div>
         <figure className="figure mt-3"><SignalExplorer rec={rec} t={t} span={span} channels={channels} onScrub={setT} /></figure>
         <div className="grid md:grid-cols-3 gap-3 mt-4 text-[13px]">
-          {[['Motion amplitude', <><Tex tex={`\\sigma_{|a|} = ${win.motionAmp.toFixed(2)}`} /> <span className="font-normal text-stone-500">(ACC magnitude std, stored counts)</span></>, win.motionAmp > 20 ? 'Severe — cardiac component may be non-identifiable in this window.' : 'Mild — pulse remains the dominant component.'], ['Motion frequency', win.motionFreqBPM ? <Tex tex={`${win.motionFreqBPM.toFixed(2)}\\ \\mathrm{BPM\\text{-}equiv.}`} /> : <Tex tex="\text{—}" />, win.motionFreqBPM ? <span>Inside the <Tex tex="[35,\,220]\ \mathrm{BPM}" /> candidate band: it will generate its own HR hypotheses.</span> : 'No periodic motion source.'], ['ACC role', 'Segment selection', 'ACC selects motion-quiet segments before spectral estimation (paper §3.1).']].map(([k, v, d]) => (
-            <div key={k as string} className="bg-stone-50 rounded-lg p-3"><p className="text-[11px] font-bold tracking-wider text-stone-500 uppercase">{k}</p><p className="font-semibold text-stone-800 mt-0.5">{v}</p><p className="text-stone-500 mt-1">{d}</p></div>))}
+          {[['Motion amplitude', <><Tex tex={`\\sigma_{|a|} = ${win.motionAmp.toFixed(2)}`} /> <span className="font-normal text-stone-500">(ACC magnitude std, stored counts)</span></>], ['Motion frequency', win.motionFreqBPM ? <Tex tex={`${win.motionFreqBPM.toFixed(2)}\\ \\mathrm{BPM\\text{-}equiv.}`} /> : <Tex tex="\text{—}" />], ['ACC role', 'Segment selection']].map(([k, v]) => (
+            <div key={k as string} className="bg-stone-50 rounded-lg p-3"><p className="text-[11px] font-bold tracking-wider text-stone-500 uppercase">{k}</p><p className="font-semibold text-stone-800 mt-0.5">{v}</p></div>))}
         </div>
       </article>
 
@@ -115,7 +116,7 @@ function Playground() {
             <div><p className="text-[11px] font-bold text-blue-700 uppercase">Harmonic</p><p><Tex tex={selCand.harmonic === '—' ? '\\text{—}' : selCand.harmonic.replace('×', '\\times')} /> variant{selCand.isMotionPeak ? ' · motion peak' : ''}</p></div>
             <div><p className="text-[11px] font-bold text-blue-700 uppercase">vs. reference</p><p className={Math.abs(selCand.hr - win.trueHR) <= 5 ? 'text-teal-700 font-semibold' : 'text-red-600 font-semibold'}><Tex tex={`${selCand.hr - win.trueHR >= 0 ? '+' : ''}${(selCand.hr - win.trueHR).toFixed(2)}\\ \\mathrm{BPM}`} /> {Math.abs(selCand.hr - win.trueHR) <= 5 ? '(plausible pulse)' : '(likely artifact / harmonic)'}</p></div>
           </div>
-        ) : <p className="text-[13px] text-stone-500 mt-2">In <b>Deep squats</b>, the strongest candidate sits at <Tex tex="45.90\ \mathrm{BPM}" />, some <Tex tex="35.00\ \mathrm{BPM}" /> from the <Tex tex="81.00\ \mathrm{BPM}" /> reference, and the ranker's predicted error for its top pick is <Tex tex="\approx 16.70\ \mathrm{BPM}" />. Stage 5 decides whether to report such a window.</p>}
+        ) : null}
       </article>
 
       {/* ── STAGE 3 ── */}
@@ -180,7 +181,6 @@ function Playground() {
             </div>
           )}
         </div>
-        <p className="text-[13px] text-stone-500 mt-3">Note the lesson: the motion peak often has the <em>highest spectral power</em> (feature <Tex tex="1" />) but loses on consensus, harmonic status, and temporal distance. Raw peak-picking fails; multi-feature ranking does not.</p>
       </article>
 
       {/* ── STAGE 4 ── */}
@@ -228,7 +228,6 @@ function Playground() {
               {[['Independent argmax', `${(REPLAY.windows.slice(0, vitStep + 1).reduce((s, w) => s + w.errIndep, 0) / (vitStep + 1)).toFixed(2)} BPM`, C.red], ['+ Causal Viterbi', `${(REPLAY.windows.slice(0, vitStep + 1).reduce((s, w) => s + w.errVit, 0) / (vitStep + 1)).toFixed(2)} BPM`, C.teal], ['Windows decoded', `${vitStep + 1} / ${REPLAY.windows.length}`, C.ink]].map(([k, v, col]) => (
                 <div key={k} className="bg-stone-50 rounded-lg py-3"><p className="font-serif text-xl font-medium" style={{ color: col as string }}><Tex tex={toTexExpr(v)} /></p><p className="text-[11px] text-stone-500 mt-0.5">{k} MAE so far</p></div>))}
             </div>
-            <p className="text-[12px] text-stone-500 mt-3">Paper (primary, <Tex tex="5" /> seeds): scoring alone <Tex tex="12.94 \to" /> <b className="text-teal-700"><Tex tex="10.91\ \mathrm{BPM}" /></b> motion MAE after causal decoding. Fixed-run ablation: causal <Tex tex="10.66" /> vs. full-sequence <Tex tex="10.88\ \mathrm{BPM}" />.</p>
           </div>
         </div>
       </article>
@@ -249,30 +248,17 @@ function Playground() {
           ] as [React.ReactNode, React.ReactNode][]).map(([k, v], i) => (
             <div key={i} className="bg-amber-50 border border-amber-100 rounded-lg py-3 px-2"><p className="font-serif text-xl font-medium text-stone-900">{v}</p><p className="text-[11px] text-stone-500 mt-0.5">{k}</p></div>))}
         </div>
-        <p className="text-[13px] text-stone-600 mt-2">{POLICIES[policy].note}</p>
-        <p className="text-[12px] text-stone-500 mt-1">Below, the selected policy is applied to the Stage 4 replay.</p>
         <figure className="figure mt-4">
           <p className="font-semibold text-sm mb-1">Reliability per window — click a bar to inspect its features</p>
           <ReliabilityChart windows={REPLAY.windows} thresh={POLICIES[policy].thresh} decisions={decisions} selected={relSel} onSelect={setRelSel} />
           <div className="flex flex-wrap gap-4 mt-2 text-[12px] font-semibold"><span className="text-teal-700">■ Accept — report current estimate</span><span className="text-amber-700">■ Hold — retain last trusted HR</span><span className="text-red-600">■ Reject — withhold measurement</span></div>
         </figure>
-        <div className="grid lg:grid-cols-2 gap-4 mt-4">
+        <div className="mt-4">
           <div className="figure">
             <p className="font-semibold text-sm">Reliability features — window <Tex tex={`w_{${relSel + 1}}`} /> ({relWin.isMotion ? 'deep-squat' : 'static'}) · decision: <span className={decisions[relSel].d === 'accept' ? 'text-teal-700' : decisions[relSel].d === 'hold' ? 'text-amber-700' : 'text-red-600'}>{decisions[relSel].d}</span></p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3 text-[13px]">
               {([['Reliability', `r_t = ${relWin.reliability.toFixed(2)}`], ['Candidate dispersion', `\\sigma_{\\mathrm{cand}} = ${relWin.relFeats.cand_std.toFixed(2)}\\ \\mathrm{BPM}`], ['Consensus @5 BPM', `\\rho_{5} = ${relWin.relFeats.consensus_5bpm.toFixed(2)}`], ['Consensus @10 BPM', `\\rho_{10} = ${relWin.relFeats.consensus_10bpm.toFixed(2)}`], ['Mean candidate quality', `\\bar{q} = ${relWin.relFeats.quality_mean.toFixed(2)}`], ['Near-prediction spread', `\\sigma_{\\mathrm{near}} = ${relWin.relFeats.near_pred_std.toFixed(2)}\\ \\mathrm{BPM}`], ['Valid candidates', `n_t = ${Math.round(relWin.relFeats.valid_count)}`], ['Decoded HR', `\\hat{h}_t = ${relWin.viterbiHR.toFixed(2)}\\ \\mathrm{BPM}`], ['Abs. error (eval)', `|e_t| = ${relWin.errVit.toFixed(2)}\\ \\mathrm{BPM}`]] as [string, string][]).map(([k, v]) => (
                 <div key={k} className="bg-stone-50 rounded-lg p-2.5"><p className="text-[11px] text-stone-500">{k.includes('@') ? <>Consensus @<Tex tex={`${k.split('@')[1].trim().replace(' BPM', '')}\\ \\mathrm{BPM}`} /></> : k}</p><p className="font-semibold text-stone-800 mt-0.5"><Tex tex={v} /></p></div>))}
-            </div>
-            <p className="text-[12px] text-stone-500 mt-3">Reading: motion windows collapse consensus (<Tex tex="\rho_{5}" /> falls from <Tex tex="0.30" /> to <Tex tex="0.05\text{–}0.07" />) and inflate dispersion — the pattern the reliability model reads to withhold the window.</p>
-          </div>
-          <div>
-            <figure className="figure"><ReplayTimeline windows={REPLAY.windows} upto={REPLAY.windows.length - 1} decisions={decisions} /></figure>
-            <div className="flex items-center gap-2 mt-3 text-[12px] text-stone-600 flex-wrap">
-              <span className="font-semibold">Policy state machine:</span>
-              <span className="px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-800 font-semibold">accept</span><span><Tex tex="\to" /></span>
-              <span className="px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-semibold">hold <Tex tex="\times\, m_t" /></span><span><Tex tex="\to" /></span>
-              <span className="px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-semibold">reject</span>
-              <span>over (discretised <Tex tex="r_t" /> <Tex tex="\times" /> consecutive holds <Tex tex="m_t" />), solved by value iteration with reject cost <Tex tex="\lambda_{\mathrm{rej}}" />.</span>
             </div>
           </div>
         </div>
@@ -326,7 +312,6 @@ function Evaluation() {
           </div>
           <div className="mt-auto pt-3 border-t border-stone-100">
             <p className="text-[13px] text-stone-700">Selected: <b className="text-amber-700"><Tex tex={`${PUBLISHED.coverage[covIdx].cov}\\%`} /> coverage · <Tex tex={`${PUBLISHED.coverage[covIdx].mae.toFixed(2)}\\ \\mathrm{BPM}`} /> MAE</b> <span className="text-stone-400">(motion windows)</span></p>
-            <p className="figcap">Reported-window coverage (motion windows) <Tex tex="\to" /> · MAE (<Tex tex="\mathrm{BPM}" />) <Tex tex="\uparrow" /></p>
             <label className="flex items-center gap-2 text-[13px] mt-2 cursor-pointer"><input type="checkbox" checked={showOverall} onChange={() => setShowOverall(!showOverall)} className="accent-amber-600" /> Show overall curve (static + motion)</label>
           </div>
         </div>
@@ -344,7 +329,6 @@ function Evaluation() {
           </div>
           <div className="mt-auto pt-3 border-t border-white/10">
             <p className="text-[13px] text-stone-300">Improvement: <b className="text-white"><Tex tex="-2.35\ \mathrm{BPM}" /> MAE</b> <span className="text-stone-400">from causal decoding alone, before any window is withheld.</span></p>
-            <p className="text-[12px] text-stone-400 mt-2">Heavy-tailed errors motivate temporal decoding and selective reporting.</p>
           </div>
         </div>
       </div>
@@ -363,7 +347,6 @@ function Evaluation() {
             <table className="w-full text-[13px]"><thead><tr className="text-left text-[11px] uppercase tracking-wider text-stone-500 border-b border-stone-200"><th className="px-4 py-2.5">Metric</th><th className="px-2 py-2.5 text-right">Value</th></tr></thead>
               <tbody>{[[ 'Mean latency / window', PUBLISHED.deploy.latency], ['Median latency / window', PUBLISHED.deploy.median], ['p95 latency', PUBLISHED.deploy.p95], ['Model storage', PUBLISHED.deploy.storage], ['Estimated energy / window', PUBLISHED.deploy.energy]].map(([k, v]) => <tr key={k} className="border-t border-stone-100"><td className="px-4 py-2.5 text-stone-600"><MathNumbers text={k} /></td><td className="px-2 py-2.5 text-right font-semibold text-stone-900 whitespace-nowrap"><MathNumbers text={v} /></td></tr>)}</tbody></table>
           </div>
-          <p className="text-[12px] text-stone-500 mt-3 pt-3 border-t border-stone-100">On-device selections match desktop; a live-sensing prototype streams waveforms and beat events to a browser UI.</p>
         </div>
       </div>
     </section>
