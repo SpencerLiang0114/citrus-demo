@@ -10,7 +10,7 @@ body { background: var(--paper); overflow-x: hidden; }
 details summary::-webkit-details-marker { display: none; }
 .katex { font-size: 1.08em; } /* KaTeX math runs slightly small vs Inter at equal px */
 .katex-block { display: block; overflow-x: auto; overflow-y: hidden; }
-/* Figure system (Kami): one ivory surface, no frame or shadow; the caption states what to read. */
-.figure { background: var(--ivory); border-radius: 8px; padding: 16px; margin: 0; }
+/* Figure system: one quiet white surface, hairline frame, no shadow; the caption states what to read. */
+.figure { background: var(--ivory); border: 1px solid var(--border-soft); border-radius: 10px; padding: 16px; margin: 0; }
 .figcap { font-size: 11px; line-height: 1.5; color: var(--stone-kami); margin-top: 8px; }
 .psd-label { background: rgba(255,255,255,.92); border-radius: 3px; padding: 0 4px; line-height: 1.15; }

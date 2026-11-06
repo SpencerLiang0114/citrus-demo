@@ -17,8 +17,7 @@ export function SignalExplorer({ rec, t, span, channels, onScrub }: { rec: Recor
     { key: 'red', label: 'Red PPG', color: '#7c3aed', vals: pts.map(p => p.red), show: channels.red },
     { key: 'acc', label: 'Accelerometer |a|', color: C.amber, vals: pts.map(p => p.acc), show: channels.acc },
   ].filter(c => c.show)
-  const laneH = ch.length ? (H - 30) / ch.length : H
-  const refPts = pts.filter((_, i) => i % 2 === 0)
+  const laneH = ch.length ? (H - 18) / ch.length : H
   return (
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto select-none cursor-crosshair"
@@ -29,24 +28,32 @@ export function SignalExplorer({ rec, t, span, channels, onScrub }: { rec: Recor
           const mn = Math.min(...c.vals), mx = Math.max(...c.vals), rg = (mx - mn) || 1, y0 = 8 + li * laneH
           const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${X(p.t).toFixed(1)},${(y0 + laneH - 18 - ((c.vals[i] - mn) / rg) * (laneH - 34)).toFixed(1)}`).join(' ')
           return <g key={c.key}>
-            <text x={6} y={y0 + 12} fontSize={10} fontWeight={600} fill={c.color}>{c.label}</text>
+            <rect x={0} y={y0 + 2} width={W} height={laneH - 10} rx={6} fill="#f8fafc" />
+            <text x={8} y={y0 + 14} fontSize={10} fontWeight={600} fill={c.color}>{c.label}</text>
             <line x1={0} x2={W} y1={y0 + laneH - 8} y2={y0 + laneH - 8} stroke={C.grid} />
-            <path d={path} fill="none" stroke={c.color} strokeWidth={1.4} />
+            <path d={path} fill="none" stroke={c.color} strokeWidth={1.5} strokeLinejoin="round" />
             {/* selected-window shading */}
             <rect x={X(Math.floor(t / 30) * 30)} y={y0 + 2} width={X(Math.floor(t / 30) * 30 + 30) - X(Math.floor(t / 30) * 30)} height={laneH - 12} fill={C.blue} opacity={0.05} />
           </g>
         })}
-        {/* reference HR lane (evaluation target only) */}
-        {channels.ref && <g>
-          <text x={6} y={H - 18} fontSize={10} fontWeight={600} fill={C.teal}>Reference HR</text>
-          {refPts.map((p, i) => <circle key={i} cx={X(p.t)} cy={H - 12 - (p.refHR - 50) * 0.12} r={1.6} fill={C.teal} opacity={0.7} />)}
-        </g>}
         <line x1={X(t)} x2={X(t)} y1={0} y2={H} stroke={C.ink} strokeWidth={1.2} />
         {hover !== null && <g><line x1={X(hover)} x2={X(hover)} y1={0} y2={H} stroke={C.mute} strokeDasharray="3 3" /><text x={Math.min(X(hover) + 6, W - 70)} y={14} fontSize={11} fill={C.ink}>{fmtT(hover)}</text></g>}
       </svg>
       <div className="flex justify-between text-[11px] text-stone-500"><span>{fmtT(t1)}</span><span>playhead {fmtT(t)} · click chart to scrub · shaded = selected 30 s window</span><span>{fmtT(t2)}</span></div>
     </div>
   )
+}
+
+/** Ranked candidates collapsed to one representative per 2.5 BPM cluster (max `limit`, from the top `pool`). Shared by the Stage 2 chart and its chip list so they always show the same hypotheses. */
+export function clusterRepresentatives<T extends { hr: number }>(candidates: T[], limit = 6, pool = 12): { rep: T; count: number }[] {
+  const ranked = candidates.slice(0, pool)
+  const out: { rep: T; count: number }[] = []
+  for (const c of ranked) {
+    const cl = out.find(o => Math.abs(o.rep.hr - c.hr) <= 2.5)
+    if (cl) cl.count++
+    else if (out.length < limit) out.push({ rep: c, count: 1 })
+  }
+  return out
 }
 
 // ── PSD / autocorr ──────────────────────────────────────────────────────────
@@ -87,21 +94,15 @@ export function PsdChart({ rec, win, sel, onSel }: { rec: Recording; win: Win; s
   const X = (b: number) => PAD + ((b - 35) / 185) * (W - PAD * 2), Y = (v: number) => BASE - (Math.min(v, 1.05) / 1.05) * (BASE - TOP)
   const area = (key: 'ir' | 'red') => rec.psd.map((p, i) => `${i === 0 ? 'M' : 'L'}${X(p.bpm).toFixed(1)},${Y(p[key]).toFixed(1)}`).join(' ') + ` L${X(220)},${BASE} L${X(35)},${BASE} Z`
   const line = rec.autocorr.map((p, i) => `${i === 0 ? 'M' : 'L'}${X(p.lagBPM).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ')
-  // Candidates from different estimator families can share an HR (e.g. two at 130):
-  // fan coincident markers out vertically by 13 px so neither hides the other.
-  const rawItems = win.candidates.slice(0, 12).map(c => {
+  // One marker per HR cluster (see clusterRepresentatives) — coincident
+  // dots are never drawn, and labels cannot stack on the same HR.
+  const clustered = clusterRepresentatives(win.candidates)
+  const reps = clustered.map(o => o.rep)
+  const rawItems = reps.map(c => {
     const v = rec.psd.reduce((b, p) => Math.abs(p.bpm - c.hr) < Math.abs(b.bpm - c.hr) ? p : b, rec.psd[0]).ir
-    return { id: c.id, x: X(c.hr), y: Y(Math.max(v, 0.06)), w: c.hr >= 100 ? 52 : 44, c }
+    return { id: c.id, x: X(c.hr), y: Y(Math.max(v, 0.06)), w: c.hr >= 100 ? 62 : 54, c }
   })
-  const coincident = new Map<string, number>()
-  rawItems.forEach(it => { const k = `${Math.round(it.x)}:${Math.round(it.y)}`; const n = coincident.get(k) ?? 0; coincident.set(k, n + 1); it.y += n * 13 })
-  // Cluster hypotheses within 2.5 BPM; label each cluster once, list individuals in the chips below.
-  const clusters: { rep: typeof rawItems[number]; count: number }[] = []
-  for (const it of rawItems) {
-    const cl = clusters.find(c => Math.abs(c.rep.c.hr - it.c.hr) <= 2.5)
-    if (cl) cl.count++
-    else clusters.push({ rep: it, count: 1 })
-  }
+  const clusters = rawItems.map((it, i) => ({ rep: it, count: clustered[i].count }))
   const placed = layoutCandidateLabels(clusters.map(cl => ({ ...cl.rep, w: cl.rep.w + (cl.count > 1 ? 22 : 0), count: cl.count })), W)
   const byId = new Map(rawItems.map(p => [p.id, p]))
   const clampLabel = (x: number, w: number) => Math.min(Math.max(x, w / 2 + 4), W - w / 2 - 4)
@@ -112,18 +113,19 @@ export function PsdChart({ rec, win, sel, onSel }: { rec: Recording; win: Win; s
           <line x1={X(b)} x2={X(b)} y1={TOP - 18} y2={BASE} stroke={C.grid} />
           <SvgTex x={X(b)} y={BASE + 6} w={42} tex={String(b)} color={C.mute} size={10} />
         </g>)}
-        <path d={area('ir')} fill={C.blue} opacity={0.13} /><path d={area('red')} fill="#7c3aed" opacity={0.10} />
-        <path d={line} fill="none" stroke={C.amber} strokeWidth={1.6} strokeDasharray="5 3" />
+        <path d={area('ir')} fill={C.blue} opacity={0.12} /><path d={area('red')} fill="#7c3aed" opacity={0.06} />
+        <path d={line} fill="none" stroke={C.amber} strokeWidth={1.4} strokeDasharray="5 3" opacity={0.85} />
+        <line x1={PAD} x2={W - PAD} y1={BASE} y2={BASE} stroke="#d6d3d1" strokeWidth={1} />
         {/* leader lines first, so markers and labels paint over them */}
         {placed.filter(p => p.displaced).map(p => <line key={`lead-${p.id}`} x1={p.x} y1={p.tier < 0 ? p.y + 7 : p.y - 7} x2={p.labelX} y2={p.tier < 0 ? p.labelTop : p.labelTop + LABEL_H} stroke={p.c.isMotionPeak ? C.red : C.blue} strokeWidth={0.8} opacity={0.45} />)}
         <line x1={X(win.trueHR)} x2={X(win.trueHR)} y1={26} y2={BASE} stroke={C.teal} strokeWidth={2} />
-        <SvgTex x={clampLabel(X(win.trueHR) + 76, 148)} y={2} w={148} tex={`\\text{reference }${win.trueHR}\\ \\mathrm{BPM}`} color={C.teal} size={11} bold />
+        <SvgTex x={clampLabel(X(win.trueHR) + 76, 148)} y={2} w={148} tex={`\\text{reference }${win.trueHR.toFixed(2)}\\ \\mathrm{BPM}`} color={C.teal} size={11} bold />
         {win.motionFreqBPM > 0 && <g>
           <line x1={X(win.motionFreqBPM)} x2={X(win.motionFreqBPM)} y1={26} y2={BASE} stroke={C.red} strokeWidth={1.4} strokeDasharray="4 3" />
-          <SvgTex x={clampLabel(X(win.motionFreqBPM) - 68, 132)} y={22} w={132} tex={`\\text{motion }${win.motionFreqBPM}\\ \\mathrm{BPM}`} color={C.red} size={11} />
+          <SvgTex x={clampLabel(X(win.motionFreqBPM) - 68, 132)} y={22} w={132} tex={`\\text{motion }${win.motionFreqBPM.toFixed(2)}\\ \\mathrm{BPM}`} color={C.red} size={11} />
         </g>}
-        {/* individual top-12 markers (unlabelled dots; numbers live in the chips below) */}
-        {win.candidates.slice(0, 12).map(c => {
+        {/* one marker per cluster representative (numbers live in the chips below) */}
+        {reps.map(c => {
           const p = byId.get(c.id)!
           const picked = sel?.id === c.id
           return <g key={c.id} onClick={() => onSel(c)} className="cursor-pointer">
@@ -133,10 +135,10 @@ export function PsdChart({ rec, win, sel, onSel }: { rec: Recording; win: Win; s
           </g>
         })}
         {/* one label per HR cluster — guaranteed non-overlapping by layoutCandidateLabels */}
-        {placed.map(p => <SvgTex key={`lab-${p.id}`} x={p.labelX} y={p.labelTop} w={p.w} tex={p.count > 1 ? `${p.c.hr.toFixed(1)}\\,\\text{×}${p.count}` : p.c.hr.toFixed(1)} color={p.c.isMotionPeak ? C.red : C.blue} size={11} bold />)}
+        {placed.map(p => <SvgTex key={`lab-${p.id}`} x={p.labelX} y={p.labelTop} w={p.w} tex={p.count > 1 ? `${p.c.hr.toFixed(2)}\\,\\text{×}${p.count}` : p.c.hr.toFixed(2)} color={p.c.isMotionPeak ? C.red : C.blue} size={11} bold />)}
       </svg>
-      <p className="figcap">Candidate HR (<Tex tex="\mathrm{BPM}" />) · solid fill = Welch PSD (IR / red) · dashed amber = autocorrelation</p>
-      <p className="text-xs text-stone-500 mt-1.5">Click a marker to inspect it. Under motion the <span className="text-red-600 font-semibold">tallest peak is limb-motion frequency</span>, not the pulse — the core ambiguity CITRUS resolves by scoring all hypotheses, not picking the max.</p>
+      <p className="figcap">Candidate HR (<Tex tex="\mathrm{BPM}" />) · solid fill = Welch PSD (IR / red) · dashed amber = autocorrelation · one marker per <Tex tex="2.5\ \mathrm{BPM}" /> cluster (up to <Tex tex="6" />)</p>
+      <p className="text-xs text-stone-500 mt-1.5">Under motion the <span className="text-red-600 font-semibold">tallest peak is limb-motion frequency</span>, not the pulse — the core ambiguity CITRUS resolves by scoring all hypotheses, not picking the max.</p>
     </div>
   )
 }
@@ -145,7 +147,7 @@ export function PsdChart({ rec, win, sel, onSel }: { rec: Recording; win: Win; s
 // Axis numbers are KaTeX (SvgTex).
 const topByDp = (w: ReplayWin, n = 5) => [...w.candidates].sort((a, b) => a.dpCost - b.dpCost).slice(0, n)
 
-export function ReplayViterbiGraph({ windows, upto, showIndep, showVit, showGT }: { windows: ReplayWin[]; upto: number; showIndep: boolean; showVit: boolean; showGT: boolean }) {
+export function ReplayViterbiGraph({ windows, upto, reveal = 5, showIndep, showVit, showGT }: { windows: ReplayWin[]; upto: number; reveal?: number; showIndep: boolean; showVit: boolean; showGT: boolean }) {
   const H = 330, X = (i: number) => 56 + (i / Math.max(1, windows.length - 1)) * (W - 90)
   const hrs = windows.flatMap(w => [w.trueHR, w.independentHR, w.viterbiHR, ...topByDp(w).map(c => c.hr)])
   const lo = Math.floor((Math.min(...hrs) - 8) / 10) * 10, hi = Math.ceil((Math.max(...hrs) + 8) / 10) * 10
@@ -157,15 +159,17 @@ export function ReplayViterbiGraph({ windows, upto, showIndep, showVit, showGT }
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Causal Viterbi decoding over five consecutive replay windows">
       {ticks.map(b => <g key={b}><line x1={52} x2={W - 20} y1={Y(b)} y2={Y(b)} stroke={C.grid} /><SvgTex x={30} y={Y(b) - 9} w={36} tex={String(b)} color={C.mute} size={10} /></g>)}
-      {/* chosen-predecessor edges into the frontier window (stored DP) */}
-      {upto > 0 && topByDp(frontier).map(c => c.predBpm !== null && <line key={`e-${c.id}`} x1={X(upto - 1)} y1={Y(c.predBpm)} x2={X(upto)} y2={Y(c.hr)} stroke={c.transCost > 3 ? '#fca5a5' : C.teal} strokeWidth={c.transCost > 3 ? 0.8 : 1.4} opacity={0.55} />)}
-      {windows.map((w, i) => <g key={i} opacity={i <= upto ? 1 : 0.22}>
-        {topByDp(w).map(c => <circle key={c.id} cx={X(i)} cy={Y(c.hr)} r={c.causal && i <= upto ? 6 : 3.8} fill={c.causal && i <= upto ? C.teal : '#fff'} stroke={c.causal && i <= upto ? C.teal : C.blue} strokeWidth={1.6} />)}
-        <SvgTex x={X(i)} y={H - 20} w={30} tex={`w_{${i + 1}}`} color={C.mute} size={10} />
+      {/* frontier guide — the only vertical; no predecessor spaghetti */}
+      <line x1={X(upto)} x2={X(upto)} y1={24} y2={H - 34} stroke={C.teal} strokeWidth={1} strokeDasharray="3 4" opacity={0.45} />
+      {windows.map((w, i) => <g key={i} opacity={i <= upto ? 1 : 0.18}>
+        {(i < upto ? topByDp(w) : i === upto ? topByDp(w).slice(0, reveal) : []).map(c => <circle key={c.id} cx={X(i)} cy={Y(c.hr)} r={c.causal && i <= upto ? 5.5 : 3.2} fill={c.causal && i <= upto ? C.teal : '#fff'} stroke={c.causal && i <= upto ? C.teal : '#93c5fd'} strokeWidth={1.4} />)}
+        <SvgTex x={X(i)} y={H - 20} w={30} tex={`w_{${i + 1}}`} color={i === upto ? C.teal : C.mute} size={10} bold={i === upto} />
       </g>)}
       {showIndep && path(w => w.independentHR, C.red, upto, '5 4')}
       {showVit && path(w => w.viterbiHR, C.teal, upto)}
       {showGT && path(w => w.trueHR, C.ink, upto, '2 3')}
+      {/* frontier value callouts */}
+      {showVit && <g><circle cx={X(upto)} cy={Y(frontier.viterbiHR)} r={9} fill="none" stroke={C.teal} strokeWidth={1.4} opacity={0.5} /><SvgTex x={Math.min(X(upto) + 52, W - 60)} y={Y(frontier.viterbiHR) - 24} w={104} tex={`${frontier.viterbiHR.toFixed(2)}\\ \\mathrm{BPM}`} color={C.teal} size={10} bold /></g>}
       <SvgTex x={270} y={2} w={300} tex={'\\text{top-5 by } \\tilde{D}_t(k)'} color={C.mute} size={10} align="left" />
     </svg>
   )
