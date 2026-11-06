@@ -21,12 +21,10 @@ function Playground() {
   const [channels, setChannels] = useState({ ir: true, red: true, acc: true, ref: true })
   const [selCand, setSelCand] = useState<Candidate | null>(null)
   const [scorer, setScorer] = useState<'MLP' | 'HGB'>('MLP')
-  const VIT_PER_WIN = 5 // candidate micro-steps revealed per window (25 steps total)
-  const [vitCursor, setVitCursor] = useState(0)
+  // One step = one window: each step advances the frontier by a whole w_t.
+  const [vitStep, setVitStep] = useState(0)
   const [vitPlaying, setVitPlaying] = useState(() => !(typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches))
-  const vitStep = Math.min(REPLAY.windows.length - 1, Math.floor(vitCursor / VIT_PER_WIN))
-  const vitPhase = (vitCursor % VIT_PER_WIN) + 1
-  const goVitWindow = (i: number) => { setVitPlaying(false); setVitCursor(Math.max(0, Math.min(REPLAY.windows.length - 1, i)) * VIT_PER_WIN + (VIT_PER_WIN - 1)) }
+  const goVitWindow = (i: number) => { setVitPlaying(false); setVitStep(Math.max(0, Math.min(REPLAY.windows.length - 1, i))) }
   const [cmp, setCmp] = useState({ indep: true, vit: true, gt: true })
   const [policy, setPolicy] = useState<PolicyKey>('l8')
   const [expandedCand, setExpandedCand] = useState<string | null>(null)
@@ -34,11 +32,11 @@ function Playground() {
 
   const DUR = rec.windows.length * 30
   useEffect(() => { if (!playing) return; const id = setInterval(() => setT(v => (v + 1 >= DUR ? 0 : v + 1)), 120); return () => clearInterval(id) }, [playing, DUR])
-  useEffect(() => { setSelCand(null); setVitCursor(0) }, [recId])
-  // Stage 4 autoplay: advance one micro-step at a time, loop at the end.
+  useEffect(() => { setSelCand(null); setVitStep(0) }, [recId])
+  // Stage 4 autoplay: advance one whole window per step, loop at the end.
   useEffect(() => {
     if (!vitPlaying) return
-    const id = setInterval(() => setVitCursor(c => (c >= REPLAY.windows.length * VIT_PER_WIN - 1 ? 0 : c + 1)), 700)
+    const id = setInterval(() => setVitStep(s => (s >= REPLAY.windows.length - 1 ? 0 : s + 1)), 1400)
     return () => clearInterval(id)
   }, [vitPlaying])
   const winIdx = Math.min(rec.windows.length - 1, Math.floor(t / 30))
@@ -127,29 +125,57 @@ function Playground() {
             <h3 className="font-serif text-2xl font-medium"><span className="text-blue-700">Stage 3 ·</span> Candidate Scoring</h3>
             <p className="text-stone-600 mt-2 max-w-3xl text-[15px] leading-relaxed">A learned ranker scores every candidate from structured features — spectral power, estimator consensus, harmonic status, source, and distance to the previous decoded HR — trained with soft targets centered on the reference HR. Click a bar to expand its feature breakdown.</p>
           </div>
-          <div className="flex rounded-full border border-stone-300 overflow-hidden text-[13px] font-semibold">
-            {(['MLP', 'HGB'] as const).map(s => <button key={s} onClick={() => setScorer(s)} className={`px-4 py-2 ${scorer === s ? 'bg-blue-700 text-white' : 'text-stone-600 hover:bg-stone-50'}`}>{s} scorer</button>)}
+          <div className="flex rounded-full border border-stone-300 overflow-hidden text-[13px] font-semibold" role="group" aria-label="Candidate scorer">
+            {(['MLP', 'HGB'] as const).map(s => <button key={s} aria-pressed={scorer === s} onClick={() => { setScorer(s); setExpandedCand(null) }} className={`px-4 py-2 transition-colors ${scorer === s ? (s === 'MLP' ? 'bg-violet-700 text-white' : 'bg-blue-700 text-white') : 'text-stone-600 hover:bg-stone-50'}`}>{s} scorer</button>)}
           </div>
         </div>
-        <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3"><MathNumbers text={scorer === 'MLP' ? 'MLP scorer (28k params), used in the primary 31-subject evaluation. Removing the raw-waveform CNN encoder: −0.01 BPM, 85k → 28k params.' : 'HGB scorer, used in the sustained-motion stress test and the ESP32-S3 configuration.'} /> Rankings: HGB outputs for this window (subject 00020); per-candidate MLP outputs are not in the data package.</p>
-        <div className="mt-4 space-y-1.5">
-          {win.candidates.slice(0, 8).map((c, i) => (
-            <div key={c.id}>
-              <button onClick={() => setExpandedCand(expandedCand === c.id ? null : c.id)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition ${expandedCand === c.id ? 'border-blue-400 bg-blue-50' : 'border-stone-200 hover:border-blue-300'}`}>
-                <span className="text-xs text-stone-400 w-5"><Tex tex={`\\#${i + 1}`} /></span>
-                <span className={`font-bold w-20 ${c.isMotionPeak ? 'text-red-600' : 'text-stone-800'}`}><Tex tex={`${c.hr.toFixed(2)}\\ \\mathrm{BPM}`} /></span>
-                <span className="flex-1 h-3 bg-stone-100 rounded-full overflow-hidden"><span className="block h-full rounded-full" style={{ width: `${c.score * 100}%`, background: c.isMotionPeak ? C.red : C.blue }} /></span>
-                <span className="text-xs w-14 text-right"><Tex tex={c.score.toFixed(2)} /></span>
-                <span className="text-[11px] text-stone-500 w-36 hidden md:block">{c.method} · {c.channel} · <Tex tex={c.harmonic === '—' ? '\\text{—}' : c.harmonic.replace('×', '\\times')} /></span>
-                <span className="text-[11px] font-semibold w-20 text-right">{Math.abs(c.hr - win.trueHR) <= 5 ? <span className="text-teal-700">near ref</span> : c.isMotionPeak ? <span className="text-red-600">motion peak</span> : ''}</span>
-              </button>
-              {expandedCand === c.id && (
-                <div className="mx-3 mb-2 px-4 py-3 bg-stone-50 rounded-b-lg grid grid-cols-2 md:grid-cols-5 gap-3 text-[12px]">
-                  {([['Spectral quality', c.feats.spectral], ['Consensus density @5 BPM', c.feats.consensus], ['Consensus density @10 BPM', c.feats.harmonic], ['Weighted density @10 BPM', c.feats.source], ['Channel quality', c.feats.temporal]] as const).map(([k, v]) => (
-                    <div key={k}><p className="text-stone-500">{k.includes('@') ? <>{k.split('@')[0]}@<Tex tex={`${k.split('@')[1].trim().replace(' BPM', '')}\\ \\mathrm{BPM}`} /></> : k}</p><div className="h-2 bg-stone-200 rounded-full mt-1"><div className="h-full bg-blue-600 rounded-full" style={{ width: `${v * 100}%` }} /></div><p className="mt-0.5"><Tex tex={v.toFixed(2)} /></p></div>))}
-                  <p className="col-span-full text-stone-500">Candidate cost <Tex tex="E_t(k)" /> <Tex tex={`= ${(c.cost).toFixed(2)}`} /> (−log emission probability from the HGB scorer) — passed to the Viterbi decoder in Stage 4.</p>
-                </div>)}
-            </div>))}
+        {/* The toggle must change the figure, not just this note: HGB shows the real
+            per-candidate bars stored for this window; MLP has no per-candidate outputs
+            in the data package, so its panel shows that explicitly instead of reusing HGB numbers. */}
+        <div key={scorer} className="scorer-swap">
+          <p className={`text-[12px] border rounded-lg px-3 py-2 mt-3 ${scorer === 'MLP' ? 'text-violet-900 bg-violet-50 border-violet-200' : 'text-amber-800 bg-amber-50 border-amber-200'}`}><MathNumbers text={scorer === 'MLP' ? 'MLP scorer (28k params), used in the primary 31-subject evaluation. Removing the raw-waveform CNN encoder: −0.01 BPM, 85k → 28k params.' : 'HGB scorer, used in the sustained-motion stress test and the ESP32-S3 configuration.'} /> {scorer === 'MLP' ? 'Per-candidate MLP outputs for this window are not in the data package — the panel below therefore shows the candidates unscored, plus the MLP results the paper does report. It does not reuse the HGB bars.' : 'The bars below are this scorer\u2019s real outputs for this window (subject 00020). Switch to MLP to see what is — and is not — available for it.'}</p>
+          {scorer === 'HGB' ? (
+            <div className="mt-4 space-y-1.5">
+              <p className="flex items-center gap-2 text-[12px] font-semibold text-blue-800"><span className="w-2.5 h-2.5 rounded-sm bg-blue-700 inline-block" /> HGB ranking — this window (subject 00020) · click a bar for its feature breakdown</p>
+              {win.candidates.slice(0, 8).map((c, i) => (
+                <div key={c.id}>
+                  <button onClick={() => setExpandedCand(expandedCand === c.id ? null : c.id)} aria-expanded={expandedCand === c.id} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition ${expandedCand === c.id ? 'border-blue-400 bg-blue-50' : 'border-stone-200 hover:border-blue-300'}`}>
+                    <span className="text-xs text-stone-400 w-5"><Tex tex={`\\#${i + 1}`} /></span>
+                    <span className={`font-bold w-20 ${c.isMotionPeak ? 'text-red-600' : 'text-stone-800'}`}><Tex tex={`${c.hr.toFixed(2)}\\ \\mathrm{BPM}`} /></span>
+                    <span className="flex-1 h-3 bg-stone-100 rounded-full overflow-hidden"><span className="block h-full rounded-full transition-all duration-500" style={{ width: `${c.score * 100}%`, background: c.isMotionPeak ? C.red : C.blue }} /></span>
+                    <span className="text-xs w-14 text-right"><Tex tex={c.score.toFixed(2)} /></span>
+                    <span className="text-[11px] text-stone-500 w-36 hidden md:block">{c.method} · {c.channel} · <Tex tex={c.harmonic === '—' ? '\\text{—}' : c.harmonic.replace('×', '\\times')} /></span>
+                    <span className="text-[11px] font-semibold w-20 text-right">{Math.abs(c.hr - win.trueHR) <= 5 ? <span className="text-teal-700">near ref</span> : c.isMotionPeak ? <span className="text-red-600">motion peak</span> : ''}</span>
+                  </button>
+                  {expandedCand === c.id && (
+                    <div className="mx-3 mb-2 px-4 py-3 bg-stone-50 rounded-b-lg grid grid-cols-2 md:grid-cols-5 gap-3 text-[12px]">
+                      {([['Spectral quality', c.feats.spectral], ['Consensus density @5 BPM', c.feats.consensus], ['Consensus density @10 BPM', c.feats.harmonic], ['Weighted density @10 BPM', c.feats.source], ['Channel quality', c.feats.temporal]] as const).map(([k, v]) => (
+                        <div key={k}><p className="text-stone-500">{k.includes('@') ? <>{k.split('@')[0]}@<Tex tex={`${k.split('@')[1].trim().replace(' BPM', '')}\\ \\mathrm{BPM}`} /></> : k}</p><div className="h-2 bg-stone-200 rounded-full mt-1"><div className="h-full bg-blue-600 rounded-full" style={{ width: `${v * 100}%` }} /></div><p className="mt-0.5"><Tex tex={v.toFixed(2)} /></p></div>))}
+                      <p className="col-span-full text-stone-500">Candidate cost <Tex tex="E_t(k)" /> <Tex tex={`= ${(c.cost).toFixed(2)}`} /> (−log emission probability from the HGB scorer) — passed to the Viterbi decoder in Stage 4.</p>
+                    </div>)}
+                </div>))}
+            </div>
+          ) : (
+            <div className="mt-4">
+              <p className="flex items-center gap-2 text-[12px] font-semibold text-violet-800"><span className="w-2.5 h-2.5 rounded-sm bg-violet-700 inline-block" /> MLP ranking — not stored for this window · same candidates, no invented scores</p>
+              <div className="mt-1.5 space-y-1.5" aria-label="Candidates without MLP scores">
+                {win.candidates.slice(0, 8).map((c, i) => (
+                  <div key={c.id} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-dashed border-violet-200 bg-violet-50/40 text-left">
+                    <span className="text-xs text-stone-400 w-5"><Tex tex={`\\#${i + 1}`} /></span>
+                    <span className={`font-bold w-20 ${c.isMotionPeak ? 'text-red-600' : 'text-stone-800'}`}><Tex tex={`${c.hr.toFixed(2)}\\ \\mathrm{BPM}`} /></span>
+                    <span className="flex-1 h-3 rounded-full border border-dashed border-violet-300 bg-white/60" />
+                    <span className="text-xs w-14 text-right text-stone-400">—</span>
+                    <span className="text-[11px] text-stone-500 w-36 hidden md:block">{c.method} · {c.channel} · <Tex tex={c.harmonic === '—' ? '\\text{—}' : c.harmonic.replace('×', '\\times')} /></span>
+                    <span className="text-[11px] font-semibold w-20 text-right">{Math.abs(c.hr - win.trueHR) <= 5 ? <span className="text-teal-700">near ref</span> : c.isMotionPeak ? <span className="text-red-600">motion peak</span> : ''}</span>
+                  </div>))}
+              </div>
+              <div className="grid md:grid-cols-3 gap-3 mt-3 text-[13px]">
+                {[['MLP scorer', '28k params', 'Structured candidate features only — removing the raw-waveform CNN encoder changes overall MAE by −0.01 BPM (85k → 28k params).'], ['Primary evaluation', '31 subjects · 5 seeds', 'The configuration behind the paper\u2019s headline motion results in Evaluation below.'], ['Motion MAE, scoring → + Viterbi', '12.94 → 10.91 BPM', 'Per-window MLP scoring alone, then causal decoding (5-seed primary). Per-window bars for this window were not released.']].map(([k, v, d]) => (
+                  <div key={k} className="bg-violet-50 border border-violet-100 rounded-lg p-3"><p className="text-[11px] font-bold tracking-wider text-violet-700 uppercase">{k}</p><p className="font-serif text-lg font-medium text-stone-900 mt-0.5">{v}</p><p className="text-stone-500 mt-1 text-[12px] leading-relaxed">{d}</p></div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <p className="text-[13px] text-stone-500 mt-3">Note the lesson: the motion peak often has the <em>highest spectral power</em> (feature <Tex tex="1" />) but loses on consensus, harmonic status, and temporal distance. Raw peak-picking fails; multi-feature ranking does not.</p>
       </article>
@@ -157,8 +183,8 @@ function Playground() {
       {/* ── STAGE 4 ── */}
       <article id="stage4" className="scroll-mt-36 border-t border-stone-200 pt-10 mt-12">
         <h3 className="font-serif text-2xl font-medium"><span style={{ color: C.teal }}>Stage 4 ·</span> Causal Viterbi Decoding</h3>
-        <p className="text-stone-600 mt-2 max-w-3xl text-[15px] leading-relaxed">Per-window winners can still jump implausibly. CITRUS runs an <b>online</b> Viterbi recursion: when window <Tex tex="t" /> arrives, it extends only paths ending at <Tex tex="t-1" /> — no future windows, no backward smoothing — so it deploys in real time. The decoder plays automatically below (<Tex tex="25" /> micro-steps: <Tex tex="5" /> candidates revealed per window); pause it to step by hand.</p>
-        <p className="text-[13px] text-stone-600 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2 mt-3 max-w-3xl">Sequential replay: <Tex tex="5" /> consecutive held-out windows (subject <Tex tex="\text{00001}" />, windows <Tex tex="67\text{–}71" />: <Tex tex="2" /> static, <Tex tex="3" /> deep-squat), <Tex tex="582" /> candidate rows with stored causal DP.</p>
+        <p className="text-stone-600 mt-2 max-w-3xl text-[15px] leading-relaxed">Per-window winners can still jump implausibly. CITRUS runs an <b>online</b> Viterbi recursion: when window <Tex tex="t" /> arrives, it extends only paths ending at <Tex tex="t-1" /> — no future windows, no backward smoothing — so it deploys in real time. The decoder plays automatically below — <b>one step advances to the next window</b> (<Tex tex={`w_t \\to w_{t+1}`} />, <Tex tex={`${REPLAY.windows.length}`} /> steps in total); pause it to step by hand.</p>
+        <p className="text-[13px] text-stone-600 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2 mt-3 max-w-3xl">Sequential replay: <Tex tex="5" /> consecutive held-out windows (subject <Tex tex="\text{00001}" />, windows <Tex tex="67\text{–}71" />: <Tex tex="2" /> static, <Tex tex="3" /> deep-squat), <Tex tex="582" /> candidate rows with stored causal DP. These are all the consecutive windows in the verified data package — a longer (e.g. <Tex tex="10" />-window) replay would need the authors' stored DP for further windows, so none are invented here.</p>
         <div className="bg-stone-900 text-stone-100 rounded-lg px-5 py-4 mt-4 text-center overflow-x-auto">
           <p className="text-lg md:text-xl whitespace-nowrap"><Tex tex="D_t(k) = E_t(k) + \min_{j}\bigl[\, D_{t-1}(j) + \Omega_t(j,\,k) \,\bigr], \qquad E_t(k) = -\log p_t(k)" /></p>
           <p className="text-stone-400 text-[13px] mt-2 whitespace-nowrap"><Tex tex="\Omega_t(j,k) = \lambda_{\mathrm{tr}} \min\!\Bigl\{\bigl(\Delta_{jk}/\sigma_{jk}\bigr)^{2},\, 9\Bigr\} + 0.25\Bigl(\max\{0,\, \Delta_{jk}-\tau_{jk}\}/\tau_{jk}\Bigr)^{2}" /> <span className="ml-2">with</span> <Tex tex="\lambda_{\mathrm{tr}} = 2.0" /> <span>and</span> <Tex tex="\Delta_{jk} = |h_t(k) - h_{t-1}(j)|" /></p>
@@ -167,20 +193,20 @@ function Playground() {
           <button onClick={() => setVitPlaying(p => !p)} className="px-4 py-1.5 rounded-full bg-teal-700 text-white text-[13px] font-semibold hover:bg-teal-800" aria-label={vitPlaying ? 'Pause decoder autoplay' : 'Play decoder autoplay'}>{vitPlaying ? '❚❚ Pause' : '▶ Play'}</button>
           <button onClick={() => goVitWindow(vitStep - 1)} className="px-3 py-1.5 rounded-full border border-stone-300 text-[13px] font-semibold disabled:opacity-40" disabled={vitStep === 0}>← Prev window</button>
           <button onClick={() => goVitWindow(vitStep + 1)} className="px-3 py-1.5 rounded-full border border-teal-700 text-teal-800 text-[13px] font-semibold disabled:opacity-40" disabled={vitStep === REPLAY.windows.length - 1}>Step window →</button>
-          <button onClick={() => { setVitPlaying(false); setVitCursor(0) }} className="px-3 py-1.5 rounded-full border border-stone-300 text-[13px] font-semibold">Restart</button>
-          {/* segmented step track: 5 windows × 5 candidate micro-steps, no slider */}
+          <button onClick={() => { setVitPlaying(false); setVitStep(0) }} className="px-3 py-1.5 rounded-full border border-stone-300 text-[13px] font-semibold">Restart</button>
+          {/* segmented step track: one segment per window — a step fills exactly one segment */}
           <div className="flex items-center gap-1.5 flex-1 min-w-[240px]" role="group" aria-label="Decoder step progress">
             {REPLAY.windows.map((w, i) => (
-              <button key={w.idx} onClick={() => goVitWindow(i)} title={`Window ${i + 1}`} aria-label={`Go to window ${i + 1}`} className="relative flex-1 min-w-[36px] h-2.5 p-0 rounded-full bg-stone-200 overflow-hidden">
-                <span className="absolute left-0 top-0 block h-full rounded-full bg-teal-600 transition-all duration-300" style={{ width: `${i < vitStep ? 100 : i === vitStep ? (vitPhase / VIT_PER_WIN) * 100 : 0}%` }} />
+              <button key={w.idx} onClick={() => goVitWindow(i)} title={`Window ${i + 1}`} aria-label={`Go to window ${i + 1}`} aria-current={i === vitStep ? 'step' : undefined} className="relative flex-1 min-w-[36px] h-2.5 p-0 rounded-full bg-stone-200 overflow-hidden">
+                <span className="absolute left-0 top-0 block h-full rounded-full bg-teal-600 transition-all duration-300" style={{ width: i <= vitStep ? '100%' : '0%' }} />
               </button>))}
           </div>
-          <span className="text-sm whitespace-nowrap">step <Tex tex={`${vitCursor + 1} \\;/\\; ${REPLAY.windows.length * VIT_PER_WIN}`} /> · window <Tex tex={`t = ${vitStep + 1} \\;/\\; ${REPLAY.windows.length}`} /></span>
+          <span className="text-sm whitespace-nowrap">step <Tex tex={`${vitStep + 1} \\;/\\; ${REPLAY.windows.length}`} /> · window <Tex tex={`t = ${vitStep + 1} \\;/\\; ${REPLAY.windows.length}`} /></span>
           <div className="flex gap-3 text-[12px] ml-auto">
             {([['indep', 'Independent', C.red], ['vit', 'Viterbi', C.teal], ['gt', 'Reference', C.ink]] as const).map(([k, l, col]) => <label key={k} className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={cmp[k]} onChange={() => setCmp({ ...cmp, [k]: !cmp[k] })} className="accent-teal-700" /><span style={{ color: col }} className="font-semibold">{l}</span></label>)}
           </div>
         </div>
-        <figure className="figure mt-3"><ReplayViterbiGraph windows={REPLAY.windows} upto={vitStep} reveal={vitPhase} showIndep={cmp.indep} showVit={cmp.vit} showGT={cmp.gt} /></figure>
+        <figure className="figure mt-3"><ReplayViterbiGraph windows={REPLAY.windows} upto={vitStep} showIndep={cmp.indep} showVit={cmp.vit} showGT={cmp.gt} /></figure>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 text-[13px]">
           {([['Window', <Tex tex={`w_{${vitStep + 1}}\\ \\text{(${vitWin.isMotion ? 'deep-squat, motion' : 'spo2, static'})}`} />], ['Candidates', <Tex tex={`n_t = ${vitWin.candidates.length}`} />], ['Independent argmax', <Tex tex={`${vitWin.independentHR.toFixed(2)}\\ \\mathrm{BPM}`} />], ['Causal decoded', <Tex tex={`\\hat{h}_t = ${vitWin.viterbiHR.toFixed(2)}\\ \\mathrm{BPM}`} />], ['Reference', <Tex tex={`${vitWin.trueHR.toFixed(2)}\\ \\mathrm{BPM}`} />]] as [string, React.ReactNode][]).map(([k, v]) => (
             <div key={k} className="bg-stone-50 rounded-lg p-3"><p className="text-[11px] font-bold tracking-wider text-stone-500 uppercase">{k}</p><p className="font-semibold text-stone-800 mt-0.5">{v}</p></div>))}
@@ -278,28 +304,42 @@ function Evaluation() {
         </div>
       <p className="text-sm bg-teal-50 border border-teal-200 text-teal-900 rounded-lg px-4 py-3 mt-4"><b className="font-serif text-2xl"><Tex tex="-24\%" /></b> <span className="ml-1">motion MAE vs. the LSTM baseline (<Tex tex="14.39 \to 10.91\ \mathrm{BPM}" />). Static MAE reaches <Tex tex="2.63\ \mathrm{BPM}" />.</span></p>
 
-      <div className="grid lg:grid-cols-2 gap-8 mt-12">
-        <div>
-          <h3 className="font-serif text-xl font-medium">Coverage–accuracy trade-off — Figure <Tex tex="2" /> (interactive)</h3>
-          <p className="text-sm text-stone-600 mt-1">Click an operating point. Lower coverage = high-confidence spot checks, not full monitoring.</p>
-          <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full h-auto mt-2 rounded-lg bg-white">
-            {[0, 3, 6, 9].map(m => <g key={m}><line x1={48} x2={CW - 20} y1={CY(m)} y2={CY(m)} stroke={C.grid} /><SvgMath x={38} y={CY(m) - 7} w={28} tex={String(m)} color={C.mute} /></g>)}
-            {showOverall && <path d={PUBLISHED.coverageOverall.map(p => `${CX(p.cov)},${CY(p.mae)}`).join(' L')} fill="none" stroke={C.mute} strokeWidth={1.6} strokeDasharray="4 3" markerEnd="none" />}
-            <path d={'M' + PUBLISHED.coverage.map(p => `${CX(p.cov)},${CY(p.mae)}`).join(' L')} fill="none" stroke={C.amber} strokeWidth={2.4} />
-            {PUBLISHED.coverage.map((p, i) => <g key={i} onClick={() => setCovIdx(i)} className="cursor-pointer"><circle cx={CX(p.cov)} cy={CY(p.mae)} r={i === covIdx ? 9 : 6} fill={i === covIdx ? C.amber : '#fff'} stroke={C.amber} strokeWidth={2.4} /><SvgMath x={CX(p.cov)} y={CY(p.mae) - 22} w={76} tex={`${p.cov}\\% \\cdot ${p.mae}`} color={C.amber} bold /></g>)}
-          </svg>
-          <p className="figcap">Reported-window coverage (motion windows) <Tex tex="\to" /> · MAE (<Tex tex="\mathrm{BPM}" />) <Tex tex="\uparrow" /></p>
-          <label className="flex items-center gap-2 text-[13px] mt-2 cursor-pointer"><input type="checkbox" checked={showOverall} onChange={() => setShowOverall(!showOverall)} className="accent-amber-600" /> Show overall curve (static + motion)</label>
+      {/* Matched pair: identical shell, header, body and footer rows — only the fill differs (light = interactive figure, dark = headline result). */}
+      <div className="grid lg:grid-cols-2 gap-8 mt-12 items-stretch">
+        <div className="rounded-[10px] border border-stone-200 bg-white p-5 flex flex-col h-full">
+          <div className="min-h-[76px]">
+            <h3 className="font-serif text-xl font-medium">Coverage–accuracy trade-off — Figure <Tex tex="2" /> (interactive)</h3>
+            <p className="text-sm text-stone-600 mt-1">Click an operating point. Lower coverage = high-confidence spot checks, not full monitoring.</p>
+          </div>
+          <div className="flex-1 flex items-center">
+            <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full h-auto rounded-lg bg-white" role="img" aria-label="Coverage versus MAE operating points">
+              {[0, 3, 6, 9].map(m => <g key={m}><line x1={48} x2={CW - 20} y1={CY(m)} y2={CY(m)} stroke={C.grid} /><SvgMath x={38} y={CY(m) - 7} w={28} tex={String(m)} color={C.mute} /></g>)}
+              {showOverall && <path d={'M' + PUBLISHED.coverageOverall.map(p => `${CX(p.cov)},${CY(p.mae)}`).join(' L')} fill="none" stroke={C.mute} strokeWidth={1.6} strokeDasharray="4 3" />}
+              <path d={'M' + PUBLISHED.coverage.map(p => `${CX(p.cov)},${CY(p.mae)}`).join(' L')} fill="none" stroke={C.amber} strokeWidth={2.4} />
+              {PUBLISHED.coverage.map((p, i) => <g key={i} onClick={() => setCovIdx(i)} className="cursor-pointer"><circle cx={CX(p.cov)} cy={CY(p.mae)} r={i === covIdx ? 9 : 6} fill={i === covIdx ? C.amber : '#fff'} stroke={C.amber} strokeWidth={2.4} /><SvgMath x={CX(p.cov)} y={CY(p.mae) - 22} w={76} tex={`${p.cov}\\% \\cdot ${p.mae}`} color={C.amber} bold /></g>)}
+            </svg>
+          </div>
+          <div className="mt-auto pt-3 border-t border-stone-100">
+            <p className="text-[13px] text-stone-700">Selected: <b className="text-amber-700"><Tex tex={`${PUBLISHED.coverage[covIdx].cov}\\%`} /> coverage · <Tex tex={`${PUBLISHED.coverage[covIdx].mae.toFixed(2)}\\ \\mathrm{BPM}`} /> MAE</b> <span className="text-stone-400">(motion windows)</span></p>
+            <p className="figcap">Reported-window coverage (motion windows) <Tex tex="\to" /> · MAE (<Tex tex="\mathrm{BPM}" />) <Tex tex="\uparrow" /></p>
+            <label className="flex items-center gap-2 text-[13px] mt-2 cursor-pointer"><input type="checkbox" checked={showOverall} onChange={() => setShowOverall(!showOverall)} className="accent-amber-600" /> Show overall curve (static + motion)</label>
+          </div>
         </div>
-        <div>
-          <div className="bg-stone-900 text-white rounded-lg p-5">
+        <div className="rounded-[10px] border border-stone-900 bg-stone-900 text-white p-5 flex flex-col h-full">
+          <div className="min-h-[76px]">
             <h3 className="font-serif text-xl font-medium text-white">Sustained-motion stress test</h3>
-            <div className="grid grid-cols-3 gap-3 mt-3 text-center">
-              <div><p className="font-serif text-[20px] leading-snug font-medium whitespace-nowrap"><Tex tex="17.65 \to 15.30" /></p><p className="text-[11px] text-stone-400">MAE (<Tex tex="\mathrm{BPM}" />), HGB baseline <Tex tex="\to" /> + Viterbi</p></div>
-              <div><p className="font-serif text-[20px] leading-snug font-medium whitespace-nowrap"><Tex tex="0.631 \to 0.724" /></p><p className="text-[11px] text-stone-400">Pearson <Tex tex="r" /></p></div>
-              <div><p className="font-serif text-[20px] leading-snug font-medium whitespace-nowrap"><Tex tex="40.04" /></p><p className="text-[11px] text-stone-400">Baseline <Tex tex="\mathrm{P90}" /> error (<Tex tex="\mathrm{BPM}" />) — heavy-tailed</p></div>
+            <p className="text-sm text-stone-400 mt-1">The heavy-tailed regime behind Figure <Tex tex="2" /> — why selective reporting exists.</p>
+          </div>
+          <div className="flex-1 flex flex-col justify-center">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div><p className="font-serif text-[20px] leading-snug font-medium whitespace-nowrap"><Tex tex="17.65 \to 15.30" /></p><p className="text-[11px] text-stone-400 mt-1">MAE (<Tex tex="\mathrm{BPM}" />), HGB baseline <Tex tex="\to" /> + Viterbi</p></div>
+              <div><p className="font-serif text-[20px] leading-snug font-medium whitespace-nowrap"><Tex tex="0.631 \to 0.724" /></p><p className="text-[11px] text-stone-400 mt-1">Pearson <Tex tex="r" /></p></div>
+              <div><p className="font-serif text-[20px] leading-snug font-medium whitespace-nowrap"><Tex tex="40.04" /></p><p className="text-[11px] text-stone-400 mt-1">Baseline <Tex tex="\mathrm{P90}" /> error (<Tex tex="\mathrm{BPM}" />) — heavy-tailed</p></div>
             </div>
-            <p className="text-[12px] text-stone-400 mt-3"><MathNumbers text={PUBLISHED.stress.windows} />, subject-disjoint splits. Heavy tails motivate temporal decoding and selective reporting.</p>
+          </div>
+          <div className="mt-auto pt-3 border-t border-white/10">
+            <p className="text-[13px] text-stone-300">Improvement: <b className="text-white"><Tex tex="-2.35\ \mathrm{BPM}" /> MAE</b> <span className="text-stone-400">from causal decoding alone, before any window is withheld.</span></p>
+            <p className="text-[12px] text-stone-400 mt-2"><MathNumbers text={PUBLISHED.stress.windows} />, subject-disjoint splits. Heavy tails motivate temporal decoding and selective reporting.</p>
           </div>
         </div>
       </div>

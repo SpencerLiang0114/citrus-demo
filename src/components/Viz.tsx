@@ -18,28 +18,51 @@ export function SignalExplorer({ rec, t, span, channels, onScrub }: { rec: Recor
     { key: 'acc', label: 'Accelerometer |a|', color: C.amber, vals: pts.map(p => p.acc), show: channels.acc },
   ].filter(c => c.show)
   const laneH = ch.length ? (H - 18) / ch.length : H
+  const laneY = (li: number, v: number) => { const c = ch[li]; const mn = Math.min(...c.vals), rg = (Math.max(...c.vals) - mn) || 1; return 8 + li * laneH + laneH - 18 - ((v - mn) / rg) * (laneH - 34) }
+  // Nearest stored sample to the cursor — the tooltip reports its real values, not interpolated ones.
+  let hovIdx = -1
+  if (hover !== null && pts.length) { let best = Infinity; pts.forEach((p, i) => { const d = Math.abs(p.t - hover); if (d < best) { best = d; hovIdx = i } }) }
+  const hov = hovIdx >= 0 ? pts[hovIdx] : null
+  const hovPct = hov ? ((hov.t - t1) / span) * 100 : 0
+  const fromEvent = (e: React.MouseEvent<SVGSVGElement>) => { const r = e.currentTarget.getBoundingClientRect(); return t1 + Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * span }
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto select-none cursor-crosshair"
-        onMouseMove={e => { const r = (e.target as SVGSVGElement).getBoundingClientRect(); setHover(t1 + ((e.clientX - r.left) / r.width) * span) }}
-        onMouseLeave={() => setHover(null)}
-        onClick={e => { const r = (e.target as SVGSVGElement).getBoundingClientRect(); onScrub(t1 + ((e.clientX - r.left) / r.width) * span) }}>
-        {ch.map((c, li) => {
-          const mn = Math.min(...c.vals), mx = Math.max(...c.vals), rg = (mx - mn) || 1, y0 = 8 + li * laneH
-          const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${X(p.t).toFixed(1)},${(y0 + laneH - 18 - ((c.vals[i] - mn) / rg) * (laneH - 34)).toFixed(1)}`).join(' ')
-          return <g key={c.key}>
-            <rect x={0} y={y0 + 2} width={W} height={laneH - 10} rx={6} fill="#f8fafc" />
-            <text x={8} y={y0 + 14} fontSize={10} fontWeight={600} fill={c.color}>{c.label}</text>
-            <line x1={0} x2={W} y1={y0 + laneH - 8} y2={y0 + laneH - 8} stroke={C.grid} />
-            <path d={path} fill="none" stroke={c.color} strokeWidth={1.5} strokeLinejoin="round" />
-            {/* selected-window shading */}
-            <rect x={X(Math.floor(t / 30) * 30)} y={y0 + 2} width={X(Math.floor(t / 30) * 30 + 30) - X(Math.floor(t / 30) * 30)} height={laneH - 12} fill={C.blue} opacity={0.05} />
-          </g>
-        })}
-        <line x1={X(t)} x2={X(t)} y1={0} y2={H} stroke={C.ink} strokeWidth={1.2} />
-        {hover !== null && <g><line x1={X(hover)} x2={X(hover)} y1={0} y2={H} stroke={C.mute} strokeDasharray="3 3" /><text x={Math.min(X(hover) + 6, W - 70)} y={14} fontSize={11} fill={C.ink}>{fmtT(hover)}</text></g>}
-      </svg>
-      <div className="flex justify-between text-[11px] text-stone-500"><span>{fmtT(t1)}</span><span>playhead {fmtT(t)} · click chart to scrub · shaded = selected 30 s window</span><span>{fmtT(t2)}</span></div>
+      <div className="relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto select-none cursor-crosshair block"
+          onMouseMove={e => setHover(fromEvent(e))}
+          onMouseLeave={() => setHover(null)}
+          onClick={e => onScrub(fromEvent(e))}>
+          {ch.map((c, li) => {
+            const mn = Math.min(...c.vals), mx = Math.max(...c.vals), rg = (mx - mn) || 1, y0 = 8 + li * laneH
+            const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${X(p.t).toFixed(1)},${(y0 + laneH - 18 - ((c.vals[i] - mn) / rg) * (laneH - 34)).toFixed(1)}`).join(' ')
+            return <g key={c.key}>
+              <rect x={0} y={y0 + 2} width={W} height={laneH - 10} rx={6} fill="#f8fafc" />
+              <text x={8} y={y0 + 14} fontSize={10} fontWeight={600} fill={c.color}>{c.label}</text>
+              <line x1={0} x2={W} y1={y0 + laneH - 8} y2={y0 + laneH - 8} stroke={C.grid} />
+              <path d={path} fill="none" stroke={c.color} strokeWidth={1.5} strokeLinejoin="round" />
+              {/* selected-window shading */}
+              <rect x={X(Math.floor(t / 30) * 30)} y={y0 + 2} width={X(Math.floor(t / 30) * 30 + 30) - X(Math.floor(t / 30) * 30)} height={laneH - 12} fill={C.blue} opacity={0.05} />
+            </g>
+          })}
+          <line x1={X(t)} x2={X(t)} y1={0} y2={H} stroke={C.ink} strokeWidth={1.2} />
+          {hov && <g>
+            <line x1={X(hov.t)} x2={X(hov.t)} y1={0} y2={H} stroke={C.mute} strokeDasharray="3 3" />
+            {ch.map((c, li) => <circle key={c.key} cx={X(hov.t)} cy={laneY(li, c.vals[hovIdx])} r={4} fill={c.color} stroke="#fff" strokeWidth={1.6} />)}
+          </g>}
+        </svg>
+        {hov && (
+          <div className="absolute top-1 z-10 pointer-events-none bg-stone-900/95 text-white rounded-lg px-3 py-2 shadow-lg min-w-[168px]" style={{ left: `${hovPct}%`, transform: `translateX(${hovPct > 68 ? 'calc(-100% - 10px)' : '10px'})` }} role="status">
+            <p className="text-[11px] font-bold text-stone-300">{fmtT(hov.t)} · t = {hov.t.toFixed(2)} s</p>
+            <div className="mt-1 space-y-0.5 text-[12px]">
+              {channels.ir && <p className="flex justify-between gap-4"><span style={{ color: '#93c5fd' }}>Infrared PPG</span><b className="font-mono font-semibold">{Math.round(hov.ir).toLocaleString('en-US')}</b></p>}
+              {channels.red && <p className="flex justify-between gap-4"><span style={{ color: '#c4b5fd' }}>Red PPG</span><b className="font-mono font-semibold">{Math.round(hov.red).toLocaleString('en-US')}</b></p>}
+              {channels.acc && <p className="flex justify-between gap-4"><span style={{ color: '#fcd34d' }}>Accelerometer |a|</span><b className="font-mono font-semibold">{hov.acc.toFixed(1)}</b></p>}
+            </div>
+            <p className="text-[10px] text-stone-400 mt-1">nearest stored sample · raw counts</p>
+          </div>
+        )}
+      </div>
+      <div className="flex justify-between text-[11px] text-stone-500"><span>{fmtT(t1)}</span><span>playhead {fmtT(t)} · hover for real values · click chart to scrub · shaded = selected 30 s window</span><span>{fmtT(t2)}</span></div>
     </div>
   )
 }
