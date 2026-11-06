@@ -7,7 +7,7 @@ export type Method = 'Welch PSD' | 'Autocorrelation' | 'Peak-interval'
 export interface Candidate {
   id: string; hr: number; method: Method; channel: 'IR' | 'Red'
   power: number; harmonic: '0.5×' | '1×' | '2×' | '—'; isMotionPeak: boolean
-  score: number; cost: number
+  score: number; mlpScore: number; cost: number
   feats: { spectral: number; consensus: number; harmonic: number; source: number; temporal: number }
 }
 export interface Win {
@@ -32,7 +32,7 @@ interface Win01 {
   candidates: {
     idx: number; bpm: number; quality: number; channel: 'IR' | 'Red'; method: string; harmonic: string
     density5: number; density10: number; weightedDensity10: number; irQuality: number; redQuality: number
-    prob: number; scoreNorm: number; emissionCost: number
+    prob: number; scoreNorm: number; mlpScore: number; emissionCost: number
   }[]
 }
 const W01 = (raw as unknown as { windows01: Win01[] }).windows01
@@ -58,7 +58,7 @@ function buildRecording(w: Win01): Recording {
     id: `${w.id}-${c.idx}`, hr: c.bpm, method: METHOD_MAP[c.method] ?? 'Welch PSD', channel: c.channel,
     power: c.quality, harmonic: (c.harmonic === '—' ? '—' : c.harmonic) as Candidate['harmonic'],
     isMotionPeak: motionFreqBPM > 0 && Math.abs(c.bpm - motionFreqBPM) <= 3,
-    score: c.scoreNorm, cost: c.emissionCost,
+    score: c.scoreNorm, mlpScore: c.mlpScore, cost: c.emissionCost,
     feats: {
       spectral: c.quality, consensus: c.density5, harmonic: c.density10,
       source: c.weightedDensity10, temporal: c.channel === 'IR' ? c.irQuality : c.redQuality,

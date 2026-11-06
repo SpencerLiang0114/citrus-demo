@@ -129,11 +129,8 @@ function Playground() {
             {(['MLP', 'HGB'] as const).map(s => <button key={s} aria-pressed={scorer === s} onClick={() => { setScorer(s); setExpandedCand(null) }} className={`px-4 py-2 transition-colors ${scorer === s ? (s === 'MLP' ? 'bg-violet-700 text-white' : 'bg-blue-700 text-white') : 'text-stone-600 hover:bg-stone-50'}`}>{s} scorer</button>)}
           </div>
         </div>
-        {/* The toggle must change the figure, not just this note: HGB shows the real
-            per-candidate bars stored for this window; MLP has no per-candidate outputs
-            in the data package, so its panel shows that explicitly instead of reusing HGB numbers. */}
         <div key={scorer} className="scorer-swap">
-          <p className={`text-[12px] border rounded-lg px-3 py-2 mt-3 ${scorer === 'MLP' ? 'text-violet-900 bg-violet-50 border-violet-200' : 'text-amber-800 bg-amber-50 border-amber-200'}`}>{scorer === 'MLP' ? 'MLP scorer — the paper\u2019s primary configuration. Per-window scores are unavailable here, so candidates are shown unscored.' : 'HGB scorer — used for the stress test and on-device deployment. Scores below are for the current window.'}</p>
+          <p className={`text-[12px] border rounded-lg px-3 py-2 mt-3 ${scorer === 'MLP' ? 'text-violet-900 bg-violet-50 border-violet-200' : 'text-amber-800 bg-amber-50 border-amber-200'}`}>{scorer === 'MLP' ? 'MLP scorer — the paper\u2019s primary configuration, retrained here on the stored candidates (scripts/build_real_data.py).' : 'HGB scorer — used for the stress test and on-device deployment. Scores below are for the current window.'}</p>
           {scorer === 'HGB' ? (
             <div className="mt-4 space-y-1.5">
               <p className="flex items-center gap-2 text-[12px] font-semibold text-blue-800"><span className="w-2.5 h-2.5 rounded-sm bg-blue-700 inline-block" /> HGB ranking — this window · click a bar for its feature breakdown</p>
@@ -156,21 +153,27 @@ function Playground() {
                 </div>))}
             </div>
           ) : (
-            <div className="mt-4">
-              <p className="flex items-center gap-2 text-[12px] font-semibold text-violet-800"><span className="w-2.5 h-2.5 rounded-sm bg-violet-700 inline-block" /> MLP ranking — candidates shown unscored</p>
-              <div className="mt-1.5 space-y-1.5" aria-label="Candidates without MLP scores">
-                {win.candidates.slice(0, 8).map((c, i) => (
-                  <div key={c.id} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-dashed border-violet-200 bg-violet-50/40 text-left">
+            <div className="mt-4 space-y-1.5">
+              <p className="flex items-center gap-2 text-[12px] font-semibold text-violet-800"><span className="w-2.5 h-2.5 rounded-sm bg-violet-700 inline-block" /> MLP ranking — this window · click a bar for its feature breakdown</p>
+              {[...win.candidates].sort((a, b) => b.mlpScore - a.mlpScore).slice(0, 8).map((c, i) => (
+                <div key={c.id}>
+                  <button onClick={() => setExpandedCand(expandedCand === c.id ? null : c.id)} aria-expanded={expandedCand === c.id} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition ${expandedCand === c.id ? 'border-violet-400 bg-violet-50' : 'border-stone-200 hover:border-violet-300'}`}>
                     <span className="text-xs text-stone-400 w-5"><Tex tex={`\\#${i + 1}`} /></span>
                     <span className={`font-bold w-20 ${c.isMotionPeak ? 'text-red-600' : 'text-stone-800'}`}><Tex tex={`${c.hr.toFixed(2)}\\ \\mathrm{BPM}`} /></span>
-                    <span className="flex-1 h-3 rounded-full border border-dashed border-violet-300 bg-white/60" />
-                    <span className="text-xs w-14 text-right text-stone-400">—</span>
+                    <span className="flex-1 h-3 bg-stone-100 rounded-full overflow-hidden"><span className="block h-full rounded-full transition-all duration-500" style={{ width: `${c.mlpScore * 100}%`, background: c.isMotionPeak ? C.red : '#7c3aed' }} /></span>
+                    <span className="text-xs w-14 text-right"><Tex tex={c.mlpScore.toFixed(2)} /></span>
                     <span className="text-[11px] text-stone-500 w-36 hidden md:block">{c.method} · {c.channel} · <Tex tex={c.harmonic === '—' ? '\\text{—}' : c.harmonic.replace('×', '\\times')} /></span>
                     <span className="text-[11px] font-semibold w-20 text-right">{Math.abs(c.hr - win.trueHR) <= 5 ? <span className="text-teal-700">near ref</span> : c.isMotionPeak ? <span className="text-red-600">motion peak</span> : ''}</span>
-                  </div>))}
-              </div>
+                  </button>
+                  {expandedCand === c.id && (
+                    <div className="mx-3 mb-2 px-4 py-3 bg-stone-50 rounded-b-lg grid grid-cols-2 md:grid-cols-5 gap-3 text-[12px]">
+                      {([['Spectral quality', c.feats.spectral], ['Consensus density @5 BPM', c.feats.consensus], ['Consensus density @10 BPM', c.feats.harmonic], ['Weighted density @10 BPM', c.feats.source], ['Channel quality', c.feats.temporal]] as const).map(([k, v]) => (
+                        <div key={k}><p className="text-stone-500">{k.includes('@') ? <>{k.split('@')[0]}@<Tex tex={`${k.split('@')[1].trim().replace(' BPM', '')}\\ \\mathrm{BPM}`} /></> : k}</p><div className="h-2 bg-stone-200 rounded-full mt-1"><div className="h-full bg-violet-600 rounded-full" style={{ width: `${v * 100}%` }} /></div><p className="mt-0.5"><Tex tex={v.toFixed(2)} /></p></div>))}
+                      <p className="col-span-full text-stone-500">MLP score <Tex tex={`= ${c.mlpScore.toFixed(2)}`} /> — predicted soft target, normalised per window.</p>
+                    </div>)}
+                </div>))}
               <div className="grid md:grid-cols-3 gap-3 mt-3 text-[13px]">
-                {[['MLP scorer', '28k params', 'Structured candidate features only — no waveform encoder needed.'], ['Primary evaluation', 'Headline results', 'The configuration behind the motion results in Evaluation below.'], ['Motion MAE, scoring → + Viterbi', '12.94 → 10.91 BPM', 'Per-window scoring, then causal decoding.']].map(([k, v, d]) => (
+                {[['MLP scorer', 'Soft-target MLP', 'Retrained on the stored candidates, following the paper\u2019s recipe.'], ['Primary evaluation', 'Headline results', 'The configuration behind the motion results in Evaluation below.'], ['Motion MAE, scoring → + Viterbi', '12.94 → 10.91 BPM', 'Paper result: per-window scoring, then causal decoding.']].map(([k, v, d]) => (
                   <div key={k} className="bg-violet-50 border border-violet-100 rounded-lg p-3"><p className="text-[11px] font-bold tracking-wider text-violet-700 uppercase">{k}</p><p className="font-serif text-lg font-medium text-stone-900 mt-0.5">{v}</p><p className="text-stone-500 mt-1 text-[12px] leading-relaxed">{d}</p></div>
                 ))}
               </div>
@@ -294,15 +297,17 @@ function Evaluation() {
   const CW = 560, CH = 260, CX = (c: number) => 52 + ((100 - c) / 75) * (CW - 80), CY = (m: number) => CH - 36 - (m / 11) * (CH - 60)
   return (
     <section id="evaluation" className="max-w-6xl mx-auto px-5 py-16 scroll-mt-16">
-      <SectionHead kicker="Evaluation · Published results" title="What the paper reports" lede="Published results from the paper's motion-focused ring evaluation." />
+      <SectionHead kicker="Published results" title="Evaluation" lede="Published results from the paper's motion-focused ring evaluation." />
 
-      <h3 className="font-serif text-xl font-medium mt-2">Motion-robust HR estimation — Table <Tex tex="1" /> (<Tex tex="\mathrm{MAE,\ BPM}" />)</h3>
-      <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-[13px]"><thead><tr className="text-left text-stone-500 border-b border-stone-300"><th className="px-4 py-2.5">Configuration</th><th className="px-2 py-2.5">Static</th><th className="px-2 py-2.5">Motion</th><th className="px-2 py-2.5">Overall</th></tr></thead>
+      <div className="rounded-[10px] border border-stone-200 bg-white p-5">
+        <h3 className="font-serif text-xl font-medium">Motion-robust HR estimation — Table <Tex tex="1" /> (<Tex tex="\mathrm{MAE,\ BPM}" />)</h3>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-[13px]"><thead><tr className="text-left text-[11px] uppercase tracking-wider text-stone-500 border-b border-stone-200"><th className="px-4 py-2.5">Configuration</th><th className="px-2 py-2.5">Static</th><th className="px-2 py-2.5">Motion</th><th className="px-2 py-2.5">Overall</th></tr></thead>
             <tbody>{PUBLISHED.motionTable.map(r => <tr key={r.method} className={`border-t border-stone-100 ${r.method.includes('CITRUS') ? 'bg-teal-50 font-semibold' : ''}`}><td className="px-4 py-2.5">{r.method}</td><td className="px-2"><Tex tex={toTexExpr(r.static)} /></td><td className="px-2"><Tex tex={r.motion.toFixed(2)} /></td><td className="px-2"><Tex tex={toTexExpr(r.overall)} /></td></tr>)}</tbody></table>
-          <p className="text-[11px] text-stone-500 px-4 py-2"><Tex tex="\pm" /> = std over <Tex tex="5" /> seeds where reported.</p>
         </div>
-      <p className="text-sm bg-teal-50 border border-teal-200 text-teal-900 rounded-lg px-4 py-3 mt-4"><b className="font-serif text-2xl"><Tex tex="-24\%" /></b> <span className="ml-1">motion MAE vs. the LSTM baseline (<Tex tex="14.39 \to 10.91\ \mathrm{BPM}" />). Static MAE reaches <Tex tex="2.63\ \mathrm{BPM}" />.</span></p>
+        <p className="text-[11px] text-stone-500 mt-3 pt-3 border-t border-stone-100"><Tex tex="\pm" /> = std over <Tex tex="5" /> seeds where reported.</p>
+      </div>
+      <p className="text-sm bg-teal-50 border border-teal-200 text-teal-900 rounded-[10px] px-4 py-3 mt-4"><b className="font-serif text-2xl"><Tex tex="-24\%" /></b> <span className="ml-1">motion MAE vs. the LSTM baseline (<Tex tex="14.39 \to 10.91\ \mathrm{BPM}" />). Static MAE reaches <Tex tex="2.63\ \mathrm{BPM}" />.</span></p>
 
       {/* Matched pair: identical shell, header, body and footer rows — only the fill differs (light = interactive figure, dark = headline result). */}
       <div className="grid lg:grid-cols-2 gap-8 mt-12 items-stretch">
@@ -344,27 +349,21 @@ function Evaluation() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-8 mt-12">
-        <div>
-          <h3 className="font-serif text-xl font-medium">Ablations — Table <Tex tex="2" /> (expandable)</h3>
-          <div className="mt-3 space-y-2">
-            {PUBLISHED.ablations.map(a => (
-              <details key={a.ablation} className="rounded-lg bg-stone-50 group">
-                <summary className="px-4 py-3 cursor-pointer text-sm list-none flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-3"><span><b className="text-stone-800">{a.module}:</b> <span className="text-stone-600"><MathNumbers text={a.ablation} /></span></span><span className="text-[12px] text-teal-800 font-semibold sm:text-right break-words"><MathNumbers text={a.result.replace('Δ', 'Δ ')} /></span></summary>
-                <p className="px-4 pb-3.5 text-[13px] text-stone-600 border-t border-stone-100 pt-2.5"><MathNumbers text={a.detail} /></p>
-              </details>))}
+      <div className="grid lg:grid-cols-2 gap-8 mt-12 items-start">
+        <div className="rounded-[10px] border border-stone-200 bg-white p-5">
+          <h3 className="font-serif text-xl font-medium">Ablations — Table <Tex tex="2" /></h3>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-[13px]"><thead><tr className="text-left text-[11px] uppercase tracking-wider text-stone-500 border-b border-stone-200"><th className="px-4 py-2.5">Ablation</th><th className="px-2 py-2.5 text-right">Effect</th></tr></thead>
+              <tbody>{PUBLISHED.ablations.map(a => <tr key={a.ablation} className="border-t border-stone-100 align-top"><td className="px-4 py-2.5"><b className="text-stone-800">{a.module}:</b> <span className="text-stone-600"><MathNumbers text={a.ablation} /></span><p className="text-[12px] text-stone-500 mt-1 leading-relaxed"><MathNumbers text={a.detail} /></p></td><td className="px-2 py-2.5 text-right text-teal-800 font-semibold min-w-[130px]"><MathNumbers text={a.result.replace('Δ', 'Δ ')} /></td></tr>)}</tbody></table>
           </div>
         </div>
-        <div>
+        <div className="rounded-[10px] border border-stone-200 bg-white p-5">
           <h3 className="font-serif text-xl font-medium">Deployment — ESP32-S3 inference core</h3>
-          <div className="grid grid-cols-3 gap-3 mt-3 text-center">
-            {[[PUBLISHED.deploy.latency, 'mean latency / window'], [PUBLISHED.deploy.storage, 'model storage'], [PUBLISHED.deploy.p95, 'p95 latency']].map(([v, k]) => (
-              <div key={k} className="bg-stone-50 rounded-lg py-4 px-2"><p className="font-serif text-xl font-medium text-stone-900"><Tex tex={toTexExpr(v)} /></p><p className="text-[11px] text-stone-500 mt-1"><MathNumbers text={k} /></p></div>))}
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-[13px]"><thead><tr className="text-left text-[11px] uppercase tracking-wider text-stone-500 border-b border-stone-200"><th className="px-4 py-2.5">Metric</th><th className="px-2 py-2.5 text-right">Value</th></tr></thead>
+              <tbody>{[[ 'Mean latency / window', PUBLISHED.deploy.latency], ['Median latency / window', PUBLISHED.deploy.median], ['p95 latency', PUBLISHED.deploy.p95], ['Model storage', PUBLISHED.deploy.storage], ['Estimated energy / window', PUBLISHED.deploy.energy]].map(([k, v]) => <tr key={k} className="border-t border-stone-100"><td className="px-4 py-2.5 text-stone-600"><MathNumbers text={k} /></td><td className="px-2 py-2.5 text-right font-semibold text-stone-900 whitespace-nowrap"><MathNumbers text={v} /></td></tr>)}</tbody></table>
           </div>
-          <ul className="text-[13px] text-stone-600 mt-4 space-y-1.5 list-disc pl-5">
-            <li>Median latency <MathNumbers text={PUBLISHED.deploy.median} />; estimated energy <MathNumbers text={PUBLISHED.deploy.energy} /></li>
-            <li>On-device selections match desktop; a live-sensing prototype streams waveforms and beat events to a browser UI.</li>
-          </ul>
+          <p className="text-[12px] text-stone-500 mt-3 pt-3 border-t border-stone-100">On-device selections match desktop; a live-sensing prototype streams waveforms and beat events to a browser UI.</p>
         </div>
       </div>
     </section>
