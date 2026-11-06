@@ -82,6 +82,64 @@ function buildRecording(w: Win01): Recording {
 }
 export const RECORDINGS: Recording[] = W01.map(buildRecording)
 
+// ── Verified sequential replay (05_verified_HGB_replay) ─────────────────────
+// Five *consecutive* held-out windows (subject 00001, source indices 67–71:
+// two static "spo2" windows then three "deepsquat" windows), scored by the
+// authors' HGB model with the real causal DP already run. This is the only
+// sequential sequence in the data package, so Stage 4 (step decoder) and
+// Stage 5 (reliability timeline) run on it — the isolated subject-00020
+// windows above each contain a single window and cannot be stepped through.
+interface ReplayCand01 {
+  idx: number; bpm: number; predErr: number; prob: number; emissionCost: number
+  dpCost: number; transCost: number; predIdx: number; predBpm: number | null
+  independent: boolean; causal: boolean; quality: number
+  channel: 'IR' | 'Red'; method: string; harmonic: string
+}
+interface ReplayWin01 {
+  idx: number; sourceIndex: number; label: string; isMotion: boolean; subject: string
+  refHR: number; candidateCount: number; baseHR: number; decodedHR: number
+  selectedIdx: number; decoderConfidence: number; reliability: number
+  threshold: number; report: boolean
+  relFeats: { cand_std: number; consensus_5bpm: number; consensus_10bpm: number; quality_mean: number; near_pred_std: number; valid_count: number }
+  candidates: ReplayCand01[]
+}
+export interface ReplayCandidate {
+  id: string; hr: number; method: Method; channel: 'IR' | 'Red'
+  harmonic: '0.5×' | '1×' | '2×' | '—'; isMotionPeak: boolean
+  power: number; prob: number; predErr: number
+  emissionCost: number; dpCost: number; transCost: number; predBpm: number | null
+  independent: boolean; causal: boolean
+}
+export interface ReplayWin {
+  idx: number; sourceIndex: number; label: string; isMotion: boolean; subject: string
+  trueHR: number; independentHR: number; viterbiHR: number
+  reliability: number; report: boolean; threshold: number; decoderConfidence: number
+  errIndep: number; errVit: number
+  relFeats: ReplayWin01['relFeats']; candidates: ReplayCandidate[]
+}
+const REPLAY_RAW = (raw as unknown as { replay: { windows: ReplayWin01[]; lambdaTransition: number; threshold: number; heldOutSubject: string; candidateTrees: number; reliabilityTrees: number; verification: { candidate_rows: number; windows: number } } }).replay
+export const REPLAY: { windows: ReplayWin[]; lambdaTransition: number; threshold: number; heldOutSubject: string; candidateRows: number } = {
+  lambdaTransition: REPLAY_RAW.lambdaTransition,
+  threshold: REPLAY_RAW.threshold,
+  heldOutSubject: REPLAY_RAW.heldOutSubject,
+  candidateRows: REPLAY_RAW.verification.candidate_rows,
+  windows: REPLAY_RAW.windows.map(w => ({
+    idx: w.idx, sourceIndex: w.sourceIndex, label: w.label, isMotion: w.isMotion, subject: w.subject,
+    trueHR: w.refHR, independentHR: w.baseHR, viterbiHR: w.decodedHR,
+    reliability: w.reliability, report: w.report, threshold: w.threshold,
+    decoderConfidence: w.decoderConfidence,
+    errIndep: Math.abs(w.baseHR - w.refHR), errVit: Math.abs(w.decodedHR - w.refHR),
+    relFeats: w.relFeats,
+    candidates: w.candidates.map(c => ({
+      id: `replay-${w.idx}-${c.idx}`, hr: c.bpm, method: METHOD_MAP[c.method] ?? 'Welch PSD', channel: c.channel,
+      harmonic: (c.harmonic === '—' ? '—' : c.harmonic) as ReplayCandidate['harmonic'],
+      isMotionPeak: w.isMotion, power: c.quality, prob: c.prob, predErr: c.predErr,
+      emissionCost: c.emissionCost, dpCost: c.dpCost, transCost: c.transCost, predBpm: c.predBpm,
+      independent: c.independent, causal: c.causal,
+    })),
+  })),
+}
+
 export type PolicyKey = 'l30' | 'l8' | 'l4'
 export const POLICIES: Record<PolicyKey, { label: string; suffix: string; lambda: number; coverage: string; motionMAE: string; note: string; thresh: number }> = {
   l30: { label: 'λrej = 30 · full coverage', suffix: 'full coverage', lambda: 30, coverage: '100%', motionMAE: '9.99 BPM', note: 'Policy emits every window — accepts or holds through unreliable stretches.', thresh: 0.18 },

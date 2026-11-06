@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { Recording, Win, Candidate } from '../data'
+import type { Recording, Win, Candidate, ReplayWin } from '../data'
 import { fmtT } from '../data'
 import { Tex } from './Math'
 
@@ -96,12 +96,24 @@ export function PsdChart({ rec, win, sel, onSel }: { rec: Recording; win: Win; s
   // fan coincident markers out vertically by 13 px so neither hides the other.
   const rawItems = win.candidates.slice(0, 12).map(c => {
     const v = rec.psd.reduce((b, p) => Math.abs(p.bpm - c.hr) < Math.abs(b.bpm - c.hr) ? p : b, rec.psd[0]).ir
-    return { id: c.id, x: X(c.hr), y: Y(Math.max(v, 0.06)), w: c.hr >= 100 ? 36 : 28, c }
+    return { id: c.id, x: X(c.hr), y: Y(Math.max(v, 0.06)), w: c.hr >= 100 ? 52 : 44, c }
   })
   const coincident = new Map<string, number>()
   rawItems.forEach(it => { const k = `${Math.round(it.x)}:${Math.round(it.y)}`; const n = coincident.get(k) ?? 0; coincident.set(k, n + 1); it.y += n * 13 })
-  const placed = layoutCandidateLabels(rawItems, W)
-  const byId = new Map(placed.map(p => [p.id, p]))
+  // Labelling every top-12 candidate is what overlapped: several estimators
+  // propose HRs within a fraction of 1 BPM, so their labels cannot be separated
+  // horizontally at any tier count. Cluster hypotheses within 2.5 BPM, label
+  // only each cluster's strongest candidate (with its multiplicity), and list
+  // every individual candidate in the HTML chip strip under the chart.
+  const clusters: { rep: typeof rawItems[number]; count: number }[] = []
+  for (const it of rawItems) {
+    const cl = clusters.find(c => Math.abs(c.rep.c.hr - it.c.hr) <= 2.5)
+    if (cl) cl.count++
+    else clusters.push({ rep: it, count: 1 })
+  }
+  const placed = layoutCandidateLabels(clusters.map(cl => ({ ...cl.rep, w: cl.rep.w + (cl.count > 1 ? 22 : 0), count: cl.count })), W)
+  const byId = new Map(rawItems.map(p => [p.id, p]))
+  const clampLabel = (x: number, w: number) => Math.min(Math.max(x, w / 2 + 4), W - w / 2 - 4)
   return (
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Welch PSD and autocorrelation with candidate heart-rate markers; labels are staggered to avoid overlap">
@@ -114,25 +126,101 @@ export function PsdChart({ rec, win, sel, onSel }: { rec: Recording; win: Win; s
         {/* leader lines first, so markers and labels paint over them */}
         {placed.filter(p => p.displaced).map(p => <line key={`lead-${p.id}`} x1={p.x} y1={p.tier < 0 ? p.y + 7 : p.y - 7} x2={p.labelX} y2={p.tier < 0 ? p.labelTop : p.labelTop + LABEL_H} stroke={p.c.isMotionPeak ? C.red : C.blue} strokeWidth={0.8} opacity={0.45} />)}
         <line x1={X(win.trueHR)} x2={X(win.trueHR)} y1={26} y2={BASE} stroke={C.teal} strokeWidth={2} />
-        <SvgTex x={X(win.trueHR) + 76} y={2} w={148} tex={`\\text{reference }${win.trueHR}\\ \\mathrm{BPM}`} color={C.teal} size={11} bold />
+        <SvgTex x={clampLabel(X(win.trueHR) + 76, 148)} y={2} w={148} tex={`\\text{reference }${win.trueHR}\\ \\mathrm{BPM}`} color={C.teal} size={11} bold />
         {win.motionFreqBPM > 0 && <g>
           <line x1={X(win.motionFreqBPM)} x2={X(win.motionFreqBPM)} y1={26} y2={BASE} stroke={C.red} strokeWidth={1.4} strokeDasharray="4 3" />
-          <SvgTex x={X(win.motionFreqBPM) + 68} y={22} w={132} tex={`\\text{motion }${win.motionFreqBPM}\\ \\mathrm{BPM}`} color={C.red} size={11} />
+          <SvgTex x={clampLabel(X(win.motionFreqBPM) - 68, 132)} y={22} w={132} tex={`\\text{motion }${win.motionFreqBPM}\\ \\mathrm{BPM}`} color={C.red} size={11} />
         </g>}
+        {/* individual top-12 markers (unlabelled dots; numbers live in the chips below) */}
         {win.candidates.slice(0, 12).map(c => {
           const p = byId.get(c.id)!
           const picked = sel?.id === c.id
           return <g key={c.id} onClick={() => onSel(c)} className="cursor-pointer">
             <circle cx={p.x} cy={p.y} r={16} fill="transparent" />{/* generous hit area, independent of label position */}
             {picked && <circle cx={p.x} cy={p.y} r={12} fill={c.isMotionPeak ? C.red : C.blue} opacity={0.18} />}
-            <circle cx={p.x} cy={p.y} r={picked ? 8 : 5.5} fill={c.isMotionPeak ? C.red : C.blue} stroke="#fff" strokeWidth={2} />
-            <SvgTex x={p.labelX} y={p.labelTop} w={p.w} tex={String(c.hr)} color={c.isMotionPeak ? C.red : C.blue} size={11} bold />
+            <circle cx={p.x} cy={p.y} r={picked ? 8 : 4.5} fill={c.isMotionPeak ? C.red : C.blue} stroke="#fff" strokeWidth={2} opacity={picked ? 1 : 0.75} />
           </g>
         })}
+        {/* one label per HR cluster — guaranteed non-overlapping by layoutCandidateLabels */}
+        {placed.map(p => <SvgTex key={`lab-${p.id}`} x={p.labelX} y={p.labelTop} w={p.w} tex={p.count > 1 ? `${p.c.hr.toFixed(1)}\\,\\text{×}${p.count}` : p.c.hr.toFixed(1)} color={p.c.isMotionPeak ? C.red : C.blue} size={11} bold />)}
       </svg>
       <p className="text-center text-[11px] text-stone-500 -mt-1">Candidate HR (<Tex tex="\mathrm{BPM}" />) · solid fill = Welch PSD (IR / red) · dashed amber = autocorrelation</p>
       <p className="text-xs text-stone-500 mt-1.5">Click a marker to inspect it. Under motion the <span className="text-red-600 font-semibold">tallest peak is limb-motion frequency</span>, not the pulse — the core ambiguity CITRUS resolves by scoring all hypotheses, not picking the max.</p>
     </div>
+  )
+}
+
+// ── Replay (sequential) charts: Stage 4 decoder + Stage 5 reliability ──────
+// All axis numbers are KaTeX (SvgTex), never raw SVG text.
+const topByDp = (w: ReplayWin, n = 5) => [...w.candidates].sort((a, b) => a.dpCost - b.dpCost).slice(0, n)
+
+export function ReplayViterbiGraph({ windows, upto, showIndep, showVit, showGT }: { windows: ReplayWin[]; upto: number; showIndep: boolean; showVit: boolean; showGT: boolean }) {
+  const H = 330, X = (i: number) => 56 + (i / Math.max(1, windows.length - 1)) * (W - 90)
+  const hrs = windows.flatMap(w => [w.trueHR, w.independentHR, w.viterbiHR, ...topByDp(w).map(c => c.hr)])
+  const lo = Math.floor((Math.min(...hrs) - 8) / 10) * 10, hi = Math.ceil((Math.max(...hrs) + 8) / 10) * 10
+  const Y = (hr: number) => H - 34 - ((hr - lo) / (hi - lo)) * (H - 64)
+  const ticks = [0, 1, 2, 3, 4].map(i => Math.round(lo + (i * (hi - lo)) / 4))
+  const path = (get: (w: ReplayWin) => number, color: string, uptoN: number, dash = '') => (
+    <path d={windows.slice(0, uptoN + 1).map((w, i) => `${i === 0 ? 'M' : 'L'}${X(i)},${Y(get(w))}`).join(' ')} fill="none" stroke={color} strokeWidth={2.4} strokeDasharray={dash} strokeLinejoin="round" />)
+  const frontier = windows[upto]
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Causal Viterbi decoding over five consecutive replay windows">
+      {ticks.map(b => <g key={b}><line x1={52} x2={W - 20} y1={Y(b)} y2={Y(b)} stroke={C.grid} /><SvgTex x={30} y={Y(b) - 9} w={36} tex={String(b)} color={C.mute} size={10} /></g>)}
+      {/* real chosen-predecessor edges into the frontier window (stored DP) */}
+      {upto > 0 && topByDp(frontier).map(c => c.predBpm !== null && <line key={`e-${c.id}`} x1={X(upto - 1)} y1={Y(c.predBpm)} x2={X(upto)} y2={Y(c.hr)} stroke={c.transCost > 3 ? '#fca5a5' : C.teal} strokeWidth={c.transCost > 3 ? 0.8 : 1.4} opacity={0.55} />)}
+      {windows.map((w, i) => <g key={i} opacity={i <= upto ? 1 : 0.22}>
+        {topByDp(w).map(c => <circle key={c.id} cx={X(i)} cy={Y(c.hr)} r={c.causal && i <= upto ? 6 : 3.8} fill={c.causal && i <= upto ? C.teal : '#fff'} stroke={c.causal && i <= upto ? C.teal : C.blue} strokeWidth={1.6} />)}
+        <SvgTex x={X(i)} y={H - 20} w={30} tex={`w_{${i + 1}}`} color={C.mute} size={10} />
+      </g>)}
+      {showIndep && path(w => w.independentHR, C.red, upto, '5 4')}
+      {showVit && path(w => w.viterbiHR, C.teal, upto)}
+      {showGT && path(w => w.trueHR, C.ink, upto, '2 3')}
+      <SvgTex x={270} y={2} w={420} tex={'\\text{top-}' + '5\\ \\text{by } \\tilde{D}_t(k)\\ \\text{per window}'} color={C.mute} size={10} align="left" />
+    </svg>
+  )
+}
+
+export function ReplayTimeline({ windows, upto, decisions }: { windows: ReplayWin[]; upto: number; decisions?: { reported: number | null }[] }) {
+  const H = 190, X = (i: number) => 48 + (i / Math.max(1, windows.length - 1)) * (W - 80)
+  const hrs = windows.flatMap(w => [w.trueHR, w.independentHR, w.viterbiHR])
+  const lo = Math.floor((Math.min(...hrs) - 8) / 10) * 10, hi = Math.ceil((Math.max(...hrs) + 8) / 10) * 10
+  const Y = (hr: number) => H - 32 - ((hr - lo) / (hi - lo)) * (H - 58)
+  const ticks = [0, 1, 2, 3].map(i => Math.round(lo + (i * (hi - lo)) / 3))
+  const line = (get: (w: ReplayWin) => number | null, color: string, dash = '') => {
+    let d = '', pen = false
+    windows.slice(0, upto + 1).forEach((w, i) => { const v = get(w); if (v === null) { pen = false; return } d += `${pen ? 'L' : 'M'}${X(i)},${Y(v)} `; pen = true })
+    return <path d={d} fill="none" stroke={color} strokeWidth={2.2} strokeDasharray={dash} strokeLinejoin="round" />
+  }
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Heart-rate timeline: reference, independent, Viterbi and reported values">
+      {ticks.map(b => <g key={b}><line x1={44} x2={W - 16} y1={Y(b)} y2={Y(b)} stroke={C.grid} /><SvgTex x={26} y={Y(b) - 9} w={32} tex={String(b)} color={C.mute} size={10} /></g>)}
+      {line(w => w.trueHR, C.ink, '2 3')}{line(w => w.independentHR, C.red, '5 4')}{line(w => w.viterbiHR, C.teal)}
+      {windows.slice(0, upto + 1).map((w, i) => <g key={i}><circle cx={X(i)} cy={Y(w.viterbiHR)} r={3.5} fill={C.teal} stroke="#fff" strokeWidth={1.2} /><SvgTex x={X(i)} y={H - 22} w={30} tex={`w_{${i + 1}}`} color={C.mute} size={10} /></g>)}
+      {decisions && decisions.slice(0, upto + 1).map((d, i) => d.reported !== null
+        ? <circle key={i} cx={X(i)} cy={Y(d.reported)} r={5} fill={C.amber} stroke="#fff" strokeWidth={1.5} />
+        : <SvgTex key={i} x={X(i)} y={H - 22} w={20} tex={'\\times'} color={C.red} size={13} bold />)}
+      <SvgTex x={300} y={0} w={500} tex={'\\mathrm{BPM}\\ \\cdot\\ \\text{amber} = \\text{reported (accept/hold)}'} color={C.mute} size={10} align="left" />
+    </svg>
+  )
+}
+
+/** Stage 5 figure: per-window reliability r_t against the active policy threshold. */
+export function ReliabilityChart({ windows, thresh, decisions, selected, onSelect }: { windows: ReplayWin[]; thresh: number; decisions: { d: string }[]; selected: number; onSelect: (i: number) => void }) {
+  const H = 230, X = (i: number) => 70 + (i / Math.max(1, windows.length - 1)) * (W - 130), Y = (r: number) => H - 36 - r * (H - 66), BW = 64
+  const col = (d: string) => d === 'accept' ? C.teal : d === 'hold' ? C.amber : '#dc2626'
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Reliability per replay window against the reporting threshold">
+      {[0, 0.25, 0.5, 0.75, 1].map(r => <g key={r}><line x1={52} x2={W - 20} y1={Y(r)} y2={Y(r)} stroke={C.grid} /><SvgTex x={30} y={Y(r) - 9} w={36} tex={r.toFixed(2)} color={C.mute} size={10} /></g>)}
+      <line x1={52} x2={W - 20} y1={Y(thresh)} y2={Y(thresh)} stroke={C.amber} strokeWidth={2} strokeDasharray="6 4" />
+      <SvgTex x={W - 150} y={Y(thresh) - 22} w={220} tex={`\\text{policy threshold } ${thresh.toFixed(2)}`} color={C.amber} size={10} bold />
+      {windows.map((w, i) => <g key={i} onClick={() => onSelect(i)} className="cursor-pointer">
+        <rect x={X(i) - BW / 2} y={Y(w.reliability)} width={BW} height={Y(0) - Y(w.reliability)} rx={5} fill={col(decisions[i].d)} opacity={i === selected ? 1 : 0.72} stroke={i === selected ? C.ink : 'none'} strokeWidth={i === selected ? 1.6 : 0} />
+        <SvgTex x={X(i)} y={Y(w.reliability) - 24} w={52} tex={`r_{${i + 1}}=${w.reliability.toFixed(2)}`} color={col(decisions[i].d)} size={11} bold />
+        <SvgTex x={X(i)} y={H - 22} w={52} tex={`w_{${i + 1}}`} color={C.mute} size={10} />
+        <SvgTex x={X(i)} y={H - 8} w={86} tex={`\\text{${w.isMotion ? 'motion' : 'static'}}`} color={C.mute} size={9} />
+      </g>)}
+      <SvgTex x={110} y={0} w={200} tex={'r_t\\ \\text{(reliability)}'} color={C.mute} size={10} align="left" />
+    </svg>
   )
 }
 
