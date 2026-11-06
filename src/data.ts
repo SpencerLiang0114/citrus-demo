@@ -1,5 +1,6 @@
 // ── CITRUS data layer ───────────────────────────────────────────────────────
-// Playground data is built from reference/ by scripts/build_real_data.py.
+// Playground data is the prebuilt snapshot in real-data.json (derived from
+// recorded windows; the raw recordings are not redistributed here).
 // Published numbers live in PUBLISHED.
 import raw from './real-data.json'
 
@@ -50,8 +51,8 @@ const REC_META: Record<string, { id: string; label: string; sub: string; motion:
 function buildRecording(w: Win01): Recording {
   const meta = REC_META[w.id]
   const motionFreqBPM = w.accStd >= 20 ? w.accPeakBpm : 0 // ACC spectral peak only where stored ACC actually moves
-  // All wave channels are preprocessed (band-passed 0.55–4 Hz,
-  // scripts/build_real_data.py): PPG ir/red plus the three ACC axes ax/ay/az.
+  // All wave channels are preprocessed (band-passed 0.55–4 Hz):
+  // PPG ir/red plus the three ACC axes ax/ay/az.
   // motionAmp/motionFreqBPM below still come from raw |a| (w.accStd/accPeakBpm),
   // which is what the pipeline's slice selection uses.
   const series = w.wave.t.map((t, i) => ({

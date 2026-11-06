@@ -156,7 +156,7 @@ function Playground() {
           </div>
         </div>
         <div key={scorer} className="scorer-swap">
-          <p className={`callout mt-1 ${scorer === 'MLP' ? 'callout-violet' : 'callout-amber'}`}>{scorer === 'MLP' ? 'MLP scorer — the paper’s primary configuration, retrained here on the stored candidates (scripts/build_real_data.py).' : 'HGB scorer — used for the stress test and on-device deployment. Scores below are for the current window.'}</p>
+          <p className={`callout mt-1 ${scorer === 'MLP' ? 'callout-violet' : 'callout-amber'}`}>{scorer === 'MLP' ? 'MLP scorer — the paper’s primary configuration, retrained on the recorded candidates.' : 'HGB scorer — used for the stress test and on-device deployment. Scores below are for the current window.'}</p>
           <figure className="figure mt-6">
             <div className="fig-title"><span style={{ color: scorer === 'MLP' ? '#6d28d9' : C.blue }}>{scorer} ranking — this window</span><span className="fig-sub">Click a bar for its feature breakdown</span></div>
             <div className="space-y-1.5">
@@ -386,8 +386,7 @@ function Paper() {
           </div>
           <p className="text-sm text-stone-500 mt-4 leading-relaxed">Companion of the 2026 ACM International Joint Conference on Pervasive and Ubiquitous Computing · October 11–15, 2026 · Shanghai, China · 5 pages · CC BY 4.0</p>
           <div className="flex flex-wrap gap-2.5 mt-5">
-            <a href="/citrus.pdf" className="btn btn-primary">Read the paper (PDF)</a>
-            <span className="btn btn-outline" style={{ color: 'var(--faint)', borderStyle: 'dashed' }}>Code / data: see reference/</span>
+            <a href={`${import.meta.env.BASE_URL}citrus.pdf`} className="btn btn-primary">Read the paper (PDF)</a>
           </div>
         </div>
         <div className="min-w-0">
@@ -416,7 +415,7 @@ export default function App() {
           <div className="hidden md:flex gap-5 text-sm font-medium text-stone-600 ml-2">
             {[['Overview', 'top'], ['Interactive demo', 'demo'], ['Evaluation', 'evaluation'], ['Paper', 'paper']].map(([l, id]) => <button key={id} onClick={() => scrollTo(id)} className="hover:text-blue-800 transition py-2">{l}</button>)}
           </div>
-          <div className="ml-auto"><a href="/citrus.pdf" className="btn btn-dark btn-sm">Paper PDF</a></div>
+          <div className="ml-auto"><a href={`${import.meta.env.BASE_URL}citrus.pdf`} className="btn btn-dark btn-sm">Paper PDF</a></div>
         </div>
       </nav>
 
@@ -427,10 +426,10 @@ export default function App() {
         <p className="mt-5 text-[15px] leading-relaxed"><b>Yi Wang</b> <span className="text-stone-500">(HKUST Guangzhou)</span> · <b>Siyuan Liang</b> <span className="text-stone-500">(Cornell)</span> · <b>Yuntao Wang</b> <span className="text-stone-500">(Tsinghua, corresponding)</span></p>
         <div className="flex flex-wrap gap-2.5 mt-6">
           <button onClick={() => scrollTo('demo')} className="btn btn-primary" style={{ minHeight: 44, paddingInline: 22 }}>Explore interactive demo ↓</button>
-          <a href="/citrus.pdf" className="btn btn-outline" style={{ minHeight: 44, paddingInline: 22 }}>Paper PDF</a>
+          <a href={`${import.meta.env.BASE_URL}citrus.pdf`} className="btn btn-outline" style={{ minHeight: 44, paddingInline: 22 }}>Paper PDF</a>
         </div>
         <figure className="figure mt-8">
-          <img src="/citrus-hero.gif" width={1200} height={240} className="w-full h-auto block rounded-[6px]" alt="Animated CITRUS pipeline: noisy PPG and accelerometer scroll in, become about 140 candidate heart rates per window (motion cluster at 84 BPM, pulse cluster at 114 BPM), then a decoded heart-rate trace that is accepted, held, or rejected" />
+          <img src={`${import.meta.env.BASE_URL}citrus-hero.gif`} width={1200} height={240} className="w-full h-auto block rounded-[6px]" alt="Animated CITRUS pipeline: noisy PPG and accelerometer scroll in, become about 140 candidate heart rates per window (motion cluster at 84 BPM, pulse cluster at 114 BPM), then a decoded heart-rate trace that is accepted, held, or rejected" />
           <FigCap label="Overview · The CITRUS pipeline.">Noisy PPG and accelerometer (left) become ≈140 candidate heart rates per window; causal decoding selects a plausible trace, and the reporting policy accepts, holds, or rejects each window. Work through it stage by stage below.</FigCap>
         </figure>
         <dl className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-8">

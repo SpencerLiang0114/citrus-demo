@@ -1,8 +1,12 @@
 {
   "name": "citrus-demo",
-  "private": true,
   "version": "1.0.0",
+  "description": "Interactive website for CITRUS: Candidate Inference, Temporal Decoding, and Reliability-Gated Reporting for Wearable Devices (UbiComp Companion '26)",
+  "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
